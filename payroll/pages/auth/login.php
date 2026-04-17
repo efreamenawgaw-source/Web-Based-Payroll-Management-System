@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="brand-logo-box">BiT</div>
             <div class="brand-header-text">
                 <h1>Bahir Dar Institute<br>of Technology</h1>
-                <p>Faculty of Computing</p>
+                
             </div>
         </div>
 
@@ -166,22 +166,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </button>
         </form>
 
-        <div class="login-divider">Demo Accounts</div>
-
-        <div class="login-roles">
-            <div class="role-chip" onclick="fillCredentials('admin','admin123')">
-                <i class="fas fa-user-shield"></i> Admin
-            </div>
-            <div class="role-chip" onclick="fillCredentials('hr','hr123')">
-                <i class="fas fa-users"></i> HR
-            </div>
-            <div class="role-chip" onclick="fillCredentials('finance','finance123')">
-                <i class="fas fa-coins"></i> Finance
-            </div>
-            <div class="role-chip" onclick="fillCredentials('employee','emp123')">
-                <i class="fas fa-id-badge"></i> Employee
-            </div>
-        </div>
+        <a href="../../home.php" class="btn-back-home">
+            <i class="fas fa-arrow-left"></i> Back to Home
+        </a>
 
         <div class="login-footer">
             &copy; <?= date('Y') ?> Bahir Dar Institute of Technology &nbsp;&bull;&nbsp; Payroll System v1.0
@@ -201,12 +188,6 @@ function togglePassword() {
         pwd.type = 'password';
         icon.classList.replace('fa-eye-slash', 'fa-eye');
     }
-}
-
-function fillCredentials(user, pass) {
-    document.getElementById('username').value = user;
-    document.getElementById('password').value = pass;
-    document.getElementById('username').focus();
 }
 </script>
 </body>
