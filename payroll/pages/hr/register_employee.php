@@ -1,4 +1,5 @@
 <?php
+session_start();
 $page_title = 'Register Employee';
 $active_nav = 'register';
 $depth      = '../../';

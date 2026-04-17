@@ -1,21 +1,17 @@
 <?php
 session_start();
+
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
     header('Location: ../../index.php');
     exit();
 }
 
-$error = '';
-$success = '';
+require_once '../../database/db_connect.php';
 
-// Demo credentials for prototype
-$demo_users = [
-    'admin'    => ['password' => 'admin123',    'role' => 'admin',    'name' => 'System Admin'],
-    'hr'       => ['password' => 'hr123',       'role' => 'hr',       'name' => 'HR Personnel'],
-    'finance'  => ['password' => 'finance123',  'role' => 'finance',  'name' => 'Finance Officer'],
-    'employee' => ['password' => 'emp123',      'role' => 'employee', 'name' => 'Staff Member'],
-];
+$error   = '';
+$MAX_ATTEMPTS = 5;          // lock after 5 failures
+$LOCK_MINUTES = 15;         // lock duration
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -23,22 +19,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($username) || empty($password)) {
         $error = 'Please enter both username and password.';
-    } elseif (isset($demo_users[$username]) && $demo_users[$username]['password'] === $password) {
-        $_SESSION['user_id']  = 1;
-        $_SESSION['username'] = $username;
-        $_SESSION['role']     = $demo_users[$username]['role'];
-        $_SESSION['name']     = $demo_users[$username]['name'];
-
-        $role = $_SESSION['role'];
-        switch ($role) {
-            case 'admin':    header('Location: ../admin/dashboard.php'); break;
-            case 'hr':       header('Location: ../hr/dashboard.php'); break;
-            case 'finance':  header('Location: ../finance/dashboard.php'); break;
-            case 'employee': header('Location: ../employee/dashboard.php'); break;
-        }
-        exit();
     } else {
-        $error = 'Invalid username or password. Please try again.';
+        $pdo = getDB();
+
+        // Fetch user
+        $stmt = $pdo->prepare("
+            SELECT user_id, username, password, role, full_name, is_active
+            FROM   users
+            WHERE  username = ?
+            LIMIT  1
+        ");
+        $stmt->execute([$username]);
+        $user = $stmt->fetch();
+
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+
+        if ($user && $user['is_active'] && password_verify($password, $user['password'])) {
+            // ── Successful login ──────────────────────────────
+            $_SESSION['user_id']  = $user['user_id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['role']     = $user['role'];
+            $_SESSION['name']     = $user['full_name'];
+
+            // Update last_login
+            $pdo->prepare("UPDATE users SET last_login = NOW() WHERE user_id = ?")
+                ->execute([$user['user_id']]);
+
+            // Audit log — success
+            $pdo->prepare("
+                INSERT INTO audit_logs
+                    (user_id, username, role, action, details, ip_address, status)
+                VALUES (?, ?, ?, 'Login', 'Successful login', ?, 'success')
+            ")->execute([$user['user_id'], $user['username'], $user['role'], $ip]);
+
+            // Redirect by role
+            switch ($user['role']) {
+                case 'admin':    header('Location: ../admin/dashboard.php');    break;
+                case 'hr':       header('Location: ../hr/dashboard.php');       break;
+                case 'finance':  header('Location: ../finance/dashboard.php');  break;
+                case 'employee': header('Location: ../employee/dashboard.php'); break;
+                default:         header('Location: ../auth/login.php');
+            }
+            exit();
+
+        } else {
+            // ── Failed login ──────────────────────────────────
+            if ($user) {
+                // Log failed attempt
+                $pdo->prepare("
+                    INSERT INTO audit_logs
+                        (user_id, username, role, action, details, ip_address, status)
+                    VALUES (?, ?, ?, 'Login', 'Failed login attempt', ?, 'failed')
+                ")->execute([$user['user_id'], $user['username'], $user['role'], $ip]);
+            } else {
+                // Unknown username
+                $pdo->prepare("
+                    INSERT INTO audit_logs
+                        (username, action, details, ip_address, status)
+                    VALUES (?, 'Login', 'Unknown username attempt', ?, 'failed')
+                ")->execute([$username, $ip]);
+            }
+
+            if ($user && !$user['is_active']) {
+                $error = 'Your account has been deactivated. Contact the administrator.';
+            } else {
+                $error = 'Invalid username or password. Please try again.';
+            }
+        }
     }
 }
 ?>
@@ -46,39 +93,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>Secure Login — BiT Payroll Management System</title>
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="../../assets/css/login.css">
-    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body class="login-page">
 
 <div class="login-wrapper">
 
-    <!-- ===== Left Branding Panel ===== -->
+    <!-- ── Left Branding Panel ── -->
     <div class="login-brand-panel">
         <div class="brand-header">
             <div class="brand-logo-box">BiT</div>
             <div class="brand-header-text">
                 <h1>Bahir Dar Institute<br>of Technology</h1>
-                
+                <p>Faculty of Computing</p>
             </div>
         </div>
 
         <div class="brand-content">
             <h2>Payroll Management<br>System</h2>
             <p>A secure, automated web-based solution for managing employee salaries, allowances, tax calculations, and payslip generation at BiT.</p>
-
             <div class="brand-features">
                 <div class="brand-feature">
                     <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
-                    <span>Role-based access control for Admin, HR, Finance & Staff</span>
+                    <span>Role-based access — Admin, HR, Finance & Staff</span>
                 </div>
                 <div class="brand-feature">
                     <div class="feature-icon"><i class="fas fa-calculator"></i></div>
-                    <span>Automated Ethiopian tax & pension calculations</span>
+                    <span>Automated Ethiopian tax & pension (2025 brackets)</span>
                 </div>
                 <div class="brand-feature">
                     <div class="feature-icon"><i class="fas fa-file-invoice"></i></div>
@@ -96,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 
-    <!-- ===== Right Form Panel ===== -->
+    <!-- ── Right Form Panel ── -->
     <div class="login-form-panel">
         <div class="login-form-header">
             <h2>Secure Login</h2>
@@ -110,28 +155,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <?php endif; ?>
 
-        <?php if ($success): ?>
-        <div class="login-alert success">
-            <i class="fas fa-check-circle"></i>
-            <?= htmlspecialchars($success) ?>
-        </div>
-        <?php endif; ?>
-
-        <form class="login-form" method="POST" action="">
+        <form class="login-form" method="POST" action="" novalidate>
             <div class="form-group">
                 <label class="form-label" for="username">Username</label>
                 <div class="input-wrapper">
                     <i class="fas fa-user input-icon"></i>
-                    <input
-                        type="text"
-                        id="username"
-                        name="username"
-                        class="form-control"
-                        placeholder="Enter your username"
-                        value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
-                        autocomplete="username"
-                        required
-                    >
+                    <input type="text" id="username" name="username"
+                           class="form-control"
+                           placeholder="Enter your username"
+                           value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
+                           autocomplete="username" required>
                 </div>
             </div>
 
@@ -139,16 +172,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label class="form-label" for="password">Password</label>
                 <div class="input-wrapper">
                     <i class="fas fa-lock input-icon"></i>
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        class="form-control"
-                        placeholder="Enter your password"
-                        autocomplete="current-password"
-                        required
-                    >
-                    <button type="button" class="toggle-password" onclick="togglePassword()" title="Show/Hide password">
+                    <input type="password" id="password" name="password"
+                           class="form-control"
+                           placeholder="Enter your password"
+                           autocomplete="current-password" required>
+                    <button type="button" class="toggle-password"
+                            onclick="togglePassword()" title="Show/Hide password">
                         <i class="fas fa-eye" id="eye-icon"></i>
                     </button>
                 </div>
@@ -171,7 +200,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </a>
 
         <div class="login-footer">
-            &copy; <?= date('Y') ?> Bahir Dar Institute of Technology &nbsp;&bull;&nbsp; Payroll System v1.0
+            &copy; <?= date('Y') ?> Bahir Dar Institute of Technology
+            &nbsp;&bull;&nbsp; Payroll System v1.0
         </div>
     </div>
 

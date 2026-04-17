@@ -1,4 +1,5 @@
 <?php
+session_start();
 $page_title = 'Manage Allowances';
 $active_nav = 'allowances';
 $depth      = '../../';

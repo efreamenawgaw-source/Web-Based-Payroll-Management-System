@@ -286,7 +286,7 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 -- Default admin user  (password: Admin@2025 — bcrypt hash)
 INSERT INTO users (username, password, role, full_name, email) VALUES
 ('admin',
- '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+ '$2y$12$KerV8WU3DPW6xN0dpwBHNunby5mGqHsHAXUU5Ldn1Y9iAZJYIdFxxa',
  'admin',
  'System Administrator',
  'admin@bit.edu.et');

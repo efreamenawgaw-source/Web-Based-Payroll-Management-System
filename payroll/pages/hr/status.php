@@ -1,4 +1,5 @@
 <?php
+session_start();
 $page_title = 'Employee Status';
 $active_nav = 'status';
 $depth      = '../../';
@@ -78,11 +79,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
 // ── Stats ──────────────────────────────────────────────────
 $stats = $pdo->query("
     SELECT
-        SUM(CASE WHEN status = 'active'      THEN 1 ELSE 0 END) AS active,
-        SUM(CASE WHEN status = 'on_leave'    THEN 1 ELSE 0 END) AS on_leave,
-        SUM(CASE WHEN status = 'transferred' THEN 1 ELSE 0 END) AS transferred,
-        SUM(CASE WHEN status = 'terminated'  THEN 1 ELSE 0 END) AS terminated,
-        COUNT(*)                                                 AS total
+        SUM(CASE WHEN status = 'active'      THEN 1 ELSE 0 END) AS `active`,
+        SUM(CASE WHEN status = 'on_leave'    THEN 1 ELSE 0 END) AS `on_leave`,
+        SUM(CASE WHEN status = 'transferred' THEN 1 ELSE 0 END) AS `transferred`,
+        SUM(CASE WHEN status = 'terminated'  THEN 1 ELSE 0 END) AS `terminated`,
+        COUNT(*)                                                 AS `total`
     FROM employees
 ")->fetch();
 

@@ -1,4 +1,5 @@
 <?php
+session_start();
 $page_title = 'HR Dashboard';
 $active_nav = 'dashboard';
 $depth      = '../../';
@@ -10,13 +11,13 @@ $pdo = getDB();
 // ── Stats from DB ──────────────────────────────────────────
 $stats = $pdo->query("
     SELECT
-        COUNT(*)                                                        AS total,
-        SUM(CASE WHEN status = 'active'      THEN 1 ELSE 0 END)       AS active,
-        SUM(CASE WHEN status = 'on_leave'    THEN 1 ELSE 0 END)       AS on_leave,
-        SUM(CASE WHEN status = 'terminated'  THEN 1 ELSE 0 END)       AS terminated,
-        SUM(CASE WHEN status = 'transferred' THEN 1 ELSE 0 END)       AS transferred,
+        COUNT(*)                                                        AS `total`,
+        SUM(CASE WHEN status = 'active'      THEN 1 ELSE 0 END)       AS `active`,
+        SUM(CASE WHEN status = 'on_leave'    THEN 1 ELSE 0 END)       AS `on_leave`,
+        SUM(CASE WHEN status = 'terminated'  THEN 1 ELSE 0 END)       AS `terminated`,
+        SUM(CASE WHEN status = 'transferred' THEN 1 ELSE 0 END)       AS `transferred`,
         SUM(CASE WHEN DATE_FORMAT(employment_date,'%Y-%m')
-                    = DATE_FORMAT(NOW(),'%Y-%m') THEN 1 ELSE 0 END)   AS new_this_month
+                    = DATE_FORMAT(NOW(),'%Y-%m') THEN 1 ELSE 0 END)   AS `new_this_month`
     FROM employees
 ")->fetch();
 

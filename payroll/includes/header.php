@@ -1,7 +1,9 @@
 <?php
 // Shared header — include at top of every protected page
 // Requires: $page_title, $active_nav (optional)
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../../pages/auth/login.php');
     exit();

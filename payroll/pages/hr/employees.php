@@ -1,4 +1,5 @@
 <?php
+session_start();
 $page_title = 'All Employees';
 $active_nav = 'employees';
 $depth      = '../../';
