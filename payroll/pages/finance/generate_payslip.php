@@ -166,8 +166,8 @@ require_once $depth . 'includes/header.php';
                     <tr style="font-weight:700;background:var(--bg-light);"><td style="padding:8px;">Gross Salary</td><td style="padding:8px;text-align:right;color:var(--primary);">14,000.00</td></tr>
                     <tr style="background:var(--bg-light);"><th style="padding:8px;text-align:left;color:var(--danger);">Deductions</th><th style="padding:8px;text-align:right;color:var(--danger);">ETB</th></tr>
                     <tr><td style="padding:7px 8px;">Employee Pension (7%)</td><td style="padding:7px 8px;text-align:right;color:var(--warning);">875.00</td></tr>
-                    <tr><td style="padding:7px 8px;">Income Tax</td><td style="padding:7px 8px;text-align:right;color:var(--danger);">1,948.25</td></tr>
-                    <tr style="font-weight:700;background:var(--success-light);"><td style="padding:10px 8px;color:var(--success);">NET PAY</td><td style="padding:10px 8px;text-align:right;color:var(--success);font-size:1.1rem;">11,176.75</td></tr>
+                    <tr><td style="padding:7px 8px;">Income Tax (2025 Brackets)</td><td style="padding:7px 8px;text-align:right;color:var(--danger);">2,587.50</td></tr>
+                    <tr style="font-weight:700;background:var(--success-light);"><td style="padding:10px 8px;color:var(--success);">NET PAY</td><td style="padding:10px 8px;text-align:right;color:var(--success);font-size:1.1rem;">10,537.50</td></tr>
                 </table>
                 <p style="font-size:0.72rem;color:var(--gray-400);text-align:center;margin-top:10px;">Employer Pension (11%): ETB 1,375.00 — paid by BiT</p>
             </div>

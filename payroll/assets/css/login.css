@@ -326,13 +326,29 @@ body.login-page::after {
     border: 1px solid #C8E6C9;
 }
 
-/* Responsive */
+/* ---- Responsive ---- */
 @media (max-width: 768px) {
     .login-brand-panel { display: none; }
-    .login-form-panel { width: 100%; padding: 36px 28px; }
-    .login-wrapper { max-width: 440px; }
+    .login-form-panel  { width: 100%; padding: 36px 28px; }
+    .login-wrapper     { max-width: 440px; border-radius: 16px; }
 }
 
 @media (max-width: 480px) {
-    .login-form-panel { padding: 28px 20px; }
+    body.login-page    { padding: 12px; align-items: flex-start; padding-top: 24px; }
+    .login-wrapper     { border-radius: 14px; min-height: unset; }
+    .login-form-panel  { padding: 28px 18px 32px; }
+    .login-form-header h2 { font-size: 1.4rem; }
+    .login-roles       { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .role-chip         { padding: 7px 10px; font-size: 0.75rem; }
+    .btn-login         { padding: 13px; font-size: 0.9rem; }
+
+    /* Prevent iOS zoom */
+    .form-control { font-size: 16px !important; }
+}
+
+/* Touch targets */
+@media (hover: none) and (pointer: coarse) {
+    .form-control  { font-size: 16px !important; padding: 13px 14px; }
+    .btn-login     { min-height: 50px; }
+    .role-chip     { min-height: 44px; }
 }

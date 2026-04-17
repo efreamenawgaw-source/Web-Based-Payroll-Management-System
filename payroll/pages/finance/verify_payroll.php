@@ -144,27 +144,28 @@ require_once $depth . 'includes/header.php';
                 </thead>
                 <tbody>
                     <?php
+                    // Revised 2025 tax brackets
+                    function verifyCalcTax(float $taxable): float {
+                        if ($taxable <= 2000)  return 0.00;
+                        if ($taxable <= 4000)  return ($taxable * 0.15) - 300.00;
+                        if ($taxable <= 7000)  return ($taxable * 0.20) - 500.00;
+                        if ($taxable <= 10000) return ($taxable * 0.25) - 850.00;
+                        if ($taxable <= 14000) return ($taxable * 0.30) - 1350.00;
+                        return ($taxable * 0.35) - 2050.00;
+                    }
                     $payroll = [
-                        ['EMP-101','Admasu Dejene',  12500, 14000, 875,   1,   12249],
-                        ['EMP-102','Bekele Abebe',   15200, 17900, 1064,  1,   15036],
-                        ['EMP-103','Chaltu Kebede',  9800,  11000, 686,   1,   9628],
-                        ['EMP-104','Dawit Solomon',  11000, 12700, 770,   1,   11230],
-                        ['EMP-105','Eleni Tadesse',  13500, 15600, 945,   1,   13755],
+                        ['EMP-101','Admasu Dejene',  12500, 14000],
+                        ['EMP-102','Bekele Abebe',   15200, 17900],
+                        ['EMP-103','Chaltu Kebede',  9800,  11000],
+                        ['EMP-104','Dawit Solomon',  11000, 12700],
+                        ['EMP-105','Eleni Tadesse',  13500, 15600],
                     ];
                     foreach ($payroll as $p):
-                        // Recalculate for display
                         $gross       = $p[3];
-                        $pension_emp = $p[2] * 0.07;
-                        $taxable     = $gross - $pension_emp;
-                        // Simple tax calc
-                        if ($taxable <= 600) $tax = 0;
-                        elseif ($taxable <= 1650) $tax = ($taxable * 0.10) - 60;
-                        elseif ($taxable <= 3200) $tax = ($taxable * 0.15) - 142.5;
-                        elseif ($taxable <= 5250) $tax = ($taxable * 0.20) - 302.5;
-                        elseif ($taxable <= 7800) $tax = ($taxable * 0.25) - 565;
-                        elseif ($taxable <= 10900) $tax = ($taxable * 0.30) - 955;
-                        else $tax = ($taxable * 0.35) - 1500;
-                        $net = $taxable - $tax;
+                        $pension_emp = round($p[2] * 0.07, 2);
+                        $taxable     = round($gross - $pension_emp, 2);
+                        $tax         = round(verifyCalcTax($taxable), 2);
+                        $net         = round($taxable - $tax, 2);
                     ?>
                     <tr>
                         <td><span class="badge badge-primary"><?= $p[0] ?></span></td>

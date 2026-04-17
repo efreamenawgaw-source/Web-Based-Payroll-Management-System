@@ -113,35 +113,71 @@ require_once $depth . 'includes/header.php';
 <div class="card">
     <div class="card-header">
         <h3><i class="fas fa-receipt" style="color:var(--danger);margin-right:8px"></i>Monthly Deductions Breakdown</h3>
-        <span class="badge badge-info">Based on June 2023</span>
+        <span class="badge badge-info">Based on <?= date('F Y') ?></span>
     </div>
     <div class="card-body">
+        <?php
+        // EMP-101: basic 12,500 | gross 14,000 | 2025 brackets
+        $basic_s   = 12500;
+        $gross_s   = 14000;
+        $pen_emp   = round($basic_s * 0.07, 2);          // 875.00
+        $pen_org   = round($basic_s * 0.11, 2);          // 1,375.00
+        $taxable_s = round($gross_s - $pen_emp, 2);      // 13,125.00
+        // 2025: (13,125 × 0.30) − 1,350 = 2,587.50
+        $tax_s     = round(($taxable_s * 0.30) - 1350, 2);
+        $net_s     = round($taxable_s - $tax_s, 2);      // 10,537.50
+        ?>
         <div class="grid-3" style="gap:20px;">
-            <?php
-            $deductions = [
-                ['Employee Pension (7%)',  'ETB 875.00',    'Deducted from basic salary', 'var(--warning)', 'fas fa-piggy-bank'],
-                ['Income Tax',            'ETB 1,948.25',  'Based on Ethiopian tax brackets', 'var(--danger)', 'fas fa-percent'],
-                ['Employer Pension (11%)','ETB 1,375.00',  'Paid by BiT on your behalf', 'var(--info)', 'fas fa-shield-alt'],
-            ];
-            foreach ($deductions as $d): ?>
-            <div style="padding:18px;background:var(--bg-light);border-radius:var(--radius);border-left:4px solid <?= $d[3] ?>;">
+            <div style="padding:18px;background:var(--bg-light);border-radius:var(--radius);border-left:4px solid var(--warning);">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                    <i class="<?= $d[4] ?>" style="color:<?= $d[3] ?>;font-size:1.3rem;"></i>
-                    <span style="font-weight:700;font-size:0.85rem;"><?= $d[0] ?></span>
+                    <i class="fas fa-piggy-bank" style="color:var(--warning);font-size:1.3rem;"></i>
+                    <span style="font-weight:700;font-size:0.85rem;">Employee Pension (7%)</span>
                 </div>
-                <p style="font-size:1.4rem;font-weight:700;color:<?= $d[3] ?>;margin:0 0 4px;"><?= $d[1] ?></p>
-                <p style="font-size:0.75rem;color:var(--gray-400);margin:0;"><?= $d[2] ?></p>
+                <p style="font-size:1.4rem;font-weight:700;color:var(--warning);margin:0 0 4px;">
+                    ETB <?= number_format($pen_emp, 2) ?>
+                </p>
+                <p style="font-size:0.75rem;color:var(--gray-400);margin:0;">7% of basic salary (ETB <?= number_format($basic_s) ?>)</p>
             </div>
-            <?php endforeach; ?>
+            <div style="padding:18px;background:var(--bg-light);border-radius:var(--radius);border-left:4px solid var(--danger);">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <i class="fas fa-percent" style="color:var(--danger);font-size:1.3rem;"></i>
+                    <span style="font-weight:700;font-size:0.85rem;">Income Tax (2025)</span>
+                </div>
+                <p style="font-size:1.4rem;font-weight:700;color:var(--danger);margin:0 0 4px;">
+                    ETB <?= number_format($tax_s, 2) ?>
+                </p>
+                <p style="font-size:0.75rem;color:var(--gray-400);margin:0;">
+                    Taxable: ETB <?= number_format($taxable_s, 2) ?> — Bracket 30%
+                </p>
+            </div>
+            <div style="padding:18px;background:var(--bg-light);border-radius:var(--radius);border-left:4px solid var(--info);">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <i class="fas fa-shield-alt" style="color:var(--info);font-size:1.3rem;"></i>
+                    <span style="font-weight:700;font-size:0.85rem;">Employer Pension (11%)</span>
+                </div>
+                <p style="font-size:1.4rem;font-weight:700;color:var(--info);margin:0 0 4px;">
+                    ETB <?= number_format($pen_org, 2) ?>
+                </p>
+                <p style="font-size:0.75rem;color:var(--gray-400);margin:0;">Paid by BiT on your behalf</p>
+            </div>
         </div>
 
         <!-- Net Pay Summary -->
-        <div style="margin-top:20px;padding:18px;background:var(--success-light);border-radius:var(--radius);border:2px solid var(--success);display:flex;justify-content:space-between;align-items:center;">
+        <div style="margin-top:20px;padding:18px;background:var(--success-light);border-radius:var(--radius);border:2px solid var(--success);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
             <div>
-                <p style="font-size:0.82rem;color:var(--success);font-weight:700;margin:0;text-transform:uppercase;">June 2023 Net Pay</p>
-                <p style="font-size:0.78rem;color:var(--gray-600);margin:4px 0 0;">Gross (14,000) − Pension (875) − Tax (1,948.25)</p>
+                <p style="font-size:0.82rem;color:var(--success);font-weight:700;margin:0;text-transform:uppercase;">
+                    <?= date('F Y') ?> Net Pay
+                </p>
+                <p style="font-size:0.78rem;color:var(--gray-600);margin:4px 0 0;">
+                    Gross (<?= number_format($gross_s) ?>) − Pension (<?= number_format($pen_emp, 2) ?>) − Tax (<?= number_format($tax_s, 2) ?>)
+                </p>
+                <p style="font-size:0.72rem;color:var(--gray-400);margin:4px 0 0;">
+                    <i class="fas fa-gavel"></i> Tax per Revised Monthly Employment Tax Brackets 2025
+                </p>
             </div>
-            <p style="font-size:2rem;font-weight:800;color:var(--success);margin:0;">ETB 11,176.75</p>
+            <p style="font-size:2rem;font-weight:800;color:var(--success);margin:0;">
+                ETB <?= number_format($net_s, 2) ?>
+            </p>
         </div>
     </div>
 </div>

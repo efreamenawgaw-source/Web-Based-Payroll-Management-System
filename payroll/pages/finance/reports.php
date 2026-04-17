@@ -122,24 +122,39 @@ require_once $depth . 'includes/header.php';
                 </thead>
                 <tbody>
                     <?php
+                    // Recalculate with 2025 brackets for report display
+                    function reportTax(float $taxable): float {
+                        if ($taxable <= 2000)  return 0.00;
+                        if ($taxable <= 4000)  return ($taxable * 0.15) - 300.00;
+                        if ($taxable <= 7000)  return ($taxable * 0.20) - 500.00;
+                        if ($taxable <= 10000) return ($taxable * 0.25) - 850.00;
+                        if ($taxable <= 14000) return ($taxable * 0.30) - 1350.00;
+                        return ($taxable * 0.35) - 2050.00;
+                    }
+                    // [id, name, dept, basic, gross]
                     $report_data = [
-                        ['EMP-101','Admasu Dejene',   'Computing',   12500, 14000, 875,   1375,  1948.25, 11176.75],
-                        ['EMP-102','Bekele Abebe',    'Engineering', 15200, 17900, 1064,  1672,  2837.10, 14998.90],
-                        ['EMP-103','Chaltu Kebede',   'Admin',       9800,  11000, 686,   1078,  1357.90, 8956.10],
-                        ['EMP-104','Dawit Solomon',   'Finance',     11000, 12700, 770,   1210,  1680.50, 10249.50],
-                        ['EMP-105','Eleni Tadesse',   'Computing',   13500, 15600, 945,   1485,  2448.25, 12206.75],
-                        ['EMP-106','Fatuma Ali',      'Science',     12000, 13500, 840,   1320,  1848.50, 10811.50],
-                        ['EMP-107','Girma Haile',     'IT Support',  8500,  9400,  595,   935,   1040.50, 7764.50],
-                        ['EMP-109','Ibrahim Yusuf',   'Engineering', 22000, 25000, 1540,  2420,  7175.00, 16285.00],
-                        ['EMP-110','Kidist Mekonnen', 'Admin',       8800,  9700,  616,   968,   1100.40, 7983.60],
+                        ['EMP-101','Admasu Dejene',   'Computing',   12500, 14000],
+                        ['EMP-102','Bekele Abebe',    'Engineering', 15200, 17900],
+                        ['EMP-103','Chaltu Kebede',   'Admin',       9800,  11000],
+                        ['EMP-104','Dawit Solomon',   'Finance',     11000, 12700],
+                        ['EMP-105','Eleni Tadesse',   'Computing',   13500, 15600],
+                        ['EMP-106','Fatuma Ali',      'Science',     12000, 13500],
+                        ['EMP-107','Girma Haile',     'IT Support',  8500,  9400],
+                        ['EMP-109','Ibrahim Yusuf',   'Engineering', 22000, 25000],
+                        ['EMP-110','Kidist Mekonnen', 'Admin',       8800,  9700],
                     ];
                     $t_gross = $t_pension_e = $t_pension_o = $t_tax = $t_net = 0;
                     foreach ($report_data as $r):
+                        $pen_e   = round($r[3] * 0.07, 2);
+                        $pen_o   = round($r[3] * 0.11, 2);
+                        $taxable = round($r[4] - $pen_e, 2);
+                        $tax     = round(reportTax($taxable), 2);
+                        $net     = round($taxable - $tax, 2);
                         $t_gross     += $r[4];
-                        $t_pension_e += $r[5];
-                        $t_pension_o += $r[6];
-                        $t_tax       += $r[7];
-                        $t_net       += $r[8];
+                        $t_pension_e += $pen_e;
+                        $t_pension_o += $pen_o;
+                        $t_tax       += $tax;
+                        $t_net       += $net;
                     ?>
                     <tr>
                         <td><span class="badge badge-primary"><?= $r[0] ?></span></td>
@@ -147,10 +162,10 @@ require_once $depth . 'includes/header.php';
                         <td><?= $r[2] ?></td>
                         <td><?= number_format($r[3], 2) ?></td>
                         <td><?= number_format($r[4], 2) ?></td>
-                        <td class="text-warning"><?= number_format($r[5], 2) ?></td>
-                        <td class="text-info"><?= number_format($r[6], 2) ?></td>
-                        <td class="text-danger"><?= number_format($r[7], 2) ?></td>
-                        <td class="text-bold text-success"><?= number_format($r[8], 2) ?></td>
+                        <td class="text-warning"><?= number_format($pen_e, 2) ?></td>
+                        <td class="text-info"><?= number_format($pen_o, 2) ?></td>
+                        <td class="text-danger"><?= number_format($tax, 2) ?></td>
+                        <td class="text-bold text-success"><?= number_format($net, 2) ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
