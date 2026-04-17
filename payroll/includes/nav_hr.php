@@ -1,0 +1,19 @@
+<?php $a = $active_nav ?? ''; ?>
+<span class="nav-section-label">Main</span>
+<a href="<?= $depth ?>pages/hr/dashboard.php" class="<?= $a==='dashboard'?'active':'' ?>">
+    <i class="fas fa-tachometer-alt nav-icon"></i> Dashboard
+</a>
+
+<span class="nav-section-label">Employee Management</span>
+<a href="<?= $depth ?>pages/hr/employees.php" class="<?= $a==='employees'?'active':'' ?>">
+    <i class="fas fa-id-card nav-icon"></i> All Employees
+</a>
+<a href="<?= $depth ?>pages/hr/register_employee.php" class="<?= $a==='register'?'active':'' ?>">
+    <i class="fas fa-user-plus nav-icon"></i> Register Employee
+</a>
+<a href="<?= $depth ?>pages/hr/allowances.php" class="<?= $a==='allowances'?'active':'' ?>">
+    <i class="fas fa-hand-holding-usd nav-icon"></i> Manage Allowances
+</a>
+<a href="<?= $depth ?>pages/hr/status.php" class="<?= $a==='status'?'active':'' ?>">
+    <i class="fas fa-toggle-on nav-icon"></i> Employee Status
+</a>
