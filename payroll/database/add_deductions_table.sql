@@ -60,3 +60,32 @@ CREATE TABLE IF NOT EXISTS working_days (
     CONSTRAINT fk_wd_user FOREIGN KEY (submitted_by)  REFERENCES users(user_id)    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='HR-submitted working days per employee per payroll period';
+
+-- ============================================================
+-- Add profile_photo to users table
+-- ============================================================
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS profile_photo VARCHAR(300) DEFAULT NULL
+    AFTER email;
+
+-- ============================================================
+-- Notifications table
+-- ============================================================
+CREATE TABLE IF NOT EXISTS notifications (
+    notif_id    INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    user_id     INT UNSIGNED    NOT NULL,
+    title       VARCHAR(120)    NOT NULL,
+    message     TEXT            NOT NULL,
+    type        ENUM('info','success','warning','danger') NOT NULL DEFAULT 'info',
+    link        VARCHAR(200)             DEFAULT NULL,
+    is_read     TINYINT(1)      NOT NULL DEFAULT 0,
+    created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (notif_id),
+    INDEX idx_notif_user   (user_id),
+    INDEX idx_notif_unread (user_id, is_read),
+    CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Per-user notifications';
+
+-- Create uploads directory placeholder
+-- (create folder manually: payroll/assets/uploads/profiles/)

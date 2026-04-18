@@ -103,7 +103,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     }
 }
 
-// ── DEACTIVATE user ────────────────────────────────────────
+// ── LINK employee to user ──────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['link_employee'])) {
+    $uid    = (int)($_POST['link_user_id'] ?? 0);
+    $emp_id = trim($_POST['link_emp_id']   ?? '');
+
+    if ($uid && $emp_id) {
+        try {
+            // Remove any existing link for this employee
+            $pdo->prepare("UPDATE employees SET user_id = NULL WHERE user_id = ?")
+                ->execute([$uid]);
+            // Set new link
+            $pdo->prepare("UPDATE employees SET user_id = ? WHERE emp_id = ?")
+                ->execute([$uid, $emp_id]);
+
+            $pdo->prepare("
+                INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
+                VALUES (?, ?, ?, 'Link Employee', ?, ?, ?)
+            ")->execute([
+                $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
+                "user_id:{$uid}", "Linked to emp_id:{$emp_id}",
+                $_SERVER['REMOTE_ADDR'] ?? null
+            ]);
+            $success = "User account linked to employee <strong>{$emp_id}</strong> successfully.";
+        } catch (PDOException $e) {
+            $error = 'Link failed: ' . $e->getMessage();
+        }
+    }
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['deactivate_user'])) {
     $uid = (int)($_POST['del_user_id'] ?? 0);
     if ($uid && $uid !== (int)$_SESSION['user_id']) {
@@ -158,10 +185,12 @@ $total_rows  = (int)$cnt_stmt->fetchColumn();
 $total_pages = max(1, (int)ceil($total_rows / $per_page));
 
 $stmt = $pdo->prepare("
-    SELECT user_id, username, full_name, email, role, is_active, last_login, created_at
-    FROM   users
+    SELECT u.user_id, u.username, u.full_name, u.email, u.role, u.is_active, u.last_login, u.created_at,
+           e.emp_id AS linked_emp_id
+    FROM   users u
+    LEFT JOIN employees e ON e.user_id = u.user_id
     WHERE  {$where_sql}
-    ORDER  BY created_at DESC
+    ORDER  BY u.created_at DESC
     LIMIT  {$per_page} OFFSET {$offset}
 ");
 $stmt->execute($params);
@@ -174,6 +203,13 @@ if (!empty($_GET['edit'])) {
     $es->execute([(int)$_GET['edit']]);
     $edit_user = $es->fetch();
 }
+
+// Load unlinked employees (no user_id) for linking dropdown
+$unlinked_employees = $pdo->query("
+    SELECT emp_id, full_name, position FROM employees
+    WHERE user_id IS NULL AND status = 'active'
+    ORDER BY full_name
+")->fetchAll();
 
 $role_badge = [
     'admin'    => 'badge-danger',
@@ -288,6 +324,15 @@ require_once $depth . 'includes/header.php';
                             <span class="badge <?= $u['is_active'] ? 'badge-success' : 'badge-danger' ?>">
                                 <?= $u['is_active'] ? 'Active' : 'Inactive' ?>
                             </span>
+                            <?php if ($u['role'] === 'employee'): ?>
+                            <br>
+                            <span class="badge <?= $u['linked_emp_id'] ? 'badge-info' : 'badge-warning' ?>"
+                                  style="margin-top:3px;font-size:0.65rem;">
+                                <?= $u['linked_emp_id']
+                                    ? '<i class="fas fa-link"></i> ' . htmlspecialchars($u['linked_emp_id'])
+                                    : '<i class="fas fa-unlink"></i> Not linked' ?>
+                            </span>
+                            <?php endif; ?>
                         </td>
                         <td class="text-muted" style="font-size:0.78rem;white-space:nowrap;">
                             <?= $u['last_login']
@@ -453,6 +498,67 @@ require_once $depth . 'includes/header.php';
                            placeholder="Leave blank to keep current password">
                     <span class="form-hint">Min. 6 characters. Leave blank to keep existing password.</span>
                 </div>
+
+                <?php if ($edit_user['role'] === 'employee'): ?>
+                <!-- Link to employee record -->
+                <div style="margin-top:16px;padding:14px;background:var(--bg-light);border-radius:var(--radius);">
+                    <h4 style="font-size:0.85rem;color:var(--primary);margin-bottom:10px;">
+                        <i class="fas fa-link"></i> Link to Employee Record
+                    </h4>
+                    <?php
+                    // Check if already linked
+                    $linked = $pdo->prepare("SELECT emp_id, full_name FROM employees WHERE user_id = ?");
+                    $linked->execute([$edit_user['user_id']]);
+                    $linked_emp = $linked->fetch();
+                    ?>
+                    <?php if ($linked_emp): ?>
+                    <div style="padding:8px 12px;background:var(--success-light);border-radius:6px;
+                                font-size:0.82rem;color:var(--success);margin-bottom:10px;">
+                        <i class="fas fa-check-circle"></i>
+                        Currently linked to: <strong><?= htmlspecialchars($linked_emp['emp_id']) ?>
+                        — <?= htmlspecialchars($linked_emp['full_name']) ?></strong>
+                    </div>
+                    <?php else: ?>
+                    <div style="padding:8px 12px;background:var(--warning-light);border-radius:6px;
+                                font-size:0.82rem;color:var(--warning);margin-bottom:10px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Not linked</strong> — employee cannot view payslips until linked.
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($unlinked_employees) || $linked_emp): ?>
+                    <form method="POST" action="users.php?edit=<?= $edit_user['user_id'] ?>" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+                        <input type="hidden" name="link_user_id" value="<?= $edit_user['user_id'] ?>">
+                        <div class="form-group" style="margin:0;flex:1;">
+                            <label class="form-label">Select Employee Record</label>
+                            <select name="link_emp_id" class="form-control" required>
+                                <option value="">-- Select Employee --</option>
+                                <?php if ($linked_emp): ?>
+                                <option value="<?= $linked_emp['emp_id'] ?>" selected>
+                                    <?= htmlspecialchars($linked_emp['emp_id']) ?> — <?= htmlspecialchars($linked_emp['full_name']) ?> (current)
+                                </option>
+                                <?php endif; ?>
+                                <?php foreach ($unlinked_employees as $ue): ?>
+                                <option value="<?= htmlspecialchars($ue['emp_id']) ?>">
+                                    <?= htmlspecialchars($ue['emp_id']) ?> — <?= htmlspecialchars($ue['full_name']) ?>
+                                    (<?= htmlspecialchars($ue['position']) ?>)
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div style="padding-bottom:18px;">
+                            <button type="submit" name="link_employee" class="btn btn-primary btn-sm">
+                                <i class="fas fa-link"></i> Link
+                            </button>
+                        </div>
+                    </form>
+                    <?php else: ?>
+                    <p style="font-size:0.82rem;color:var(--gray-400);">
+                        No unlinked employee records available. Register the employee in HR first.
+                    </p>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
             </div>
             <div class="modal-footer">
                 <a href="users.php" class="btn btn-secondary">Cancel</a>
