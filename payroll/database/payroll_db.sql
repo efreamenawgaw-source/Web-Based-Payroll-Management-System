@@ -273,15 +273,17 @@ INSERT INTO departments (dept_name, dept_code) VALUES
 
 -- System Settings (pension rates + tax year)
 INSERT INTO system_settings (setting_key, setting_value, description) VALUES
-('pension_employee_rate',  '0.07',                    'Employee pension rate (7% of basic salary)'),
-('pension_employer_rate',  '0.11',                    'Employer pension rate (11% of basic salary)'),
-('tax_year',               '2025',                    'Active tax bracket year'),
-('tax_proclamation',       'Revised 2025 Brackets',   'Tax regulation reference'),
-('institution_name',       'Bahir Dar Institute of Technology', 'Institution full name'),
-('institution_short',      'BiT',                     'Institution abbreviation'),
-('currency',               'ETB',                     'Currency code'),
-('payroll_day',            '28',                      'Default payroll processing day of month'),
-('session_timeout_minutes','15',                      'Auto-logout after inactivity (minutes)');
+('pension_employee_rate',      '0.07',  'Employee pension rate (7% of basic salary)'),
+('pension_employer_rate',      '0.11',  'Employer pension rate (11% of basic salary)'),
+('credit_association_rate',    '0.10',  'Credit Association deduction rate (10% of basic salary)'),
+('renaissance_dam_rate',       '0.01',  'Renaissance Dam (GERD) deduction rate (1% of basic salary)'),
+('tax_year',                   '2025',  'Active tax bracket year'),
+('tax_proclamation',           'Revised 2025 Brackets', 'Tax regulation reference'),
+('institution_name',           'Bahir Dar Institute of Technology', 'Institution full name'),
+('institution_short',          'BiT',   'Institution abbreviation'),
+('currency',                   'ETB',   'Currency code'),
+('payroll_day',                '28',    'Default payroll processing day of month'),
+('session_timeout_minutes',    '15',    'Auto-logout after inactivity (minutes)');
 
 -- Default admin user  (password: Admin@2025 — bcrypt hash)
 INSERT INTO users (username, password, role, full_name, email) VALUES

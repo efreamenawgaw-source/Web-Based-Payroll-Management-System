@@ -12,6 +12,15 @@ $error   = '';
 $cur_month = (int)date('n');
 $cur_year  = (int)date('Y');
 
+// ── Load deduction rates from system_settings ──────────────
+$rates = $pdo->query("
+    SELECT setting_key, setting_value FROM system_settings
+    WHERE  setting_key IN ('credit_association_rate','renaissance_dam_rate')
+")->fetchAll(PDO::FETCH_KEY_PAIR);
+
+$CREDIT_RATE = (float)($rates['credit_association_rate'] ?? 0.10); // default 10%
+$GERD_RATE   = (float)($rates['renaissance_dam_rate']    ?? 0.01); // default 1%
+
 $selected_emp_id = trim($_GET['emp'] ?? '');
 $f_month = (int)($_GET['month'] ?? $cur_month);
 $f_year  = (int)($_GET['year']  ?? $cur_year);
@@ -288,24 +297,40 @@ require_once $depth . 'includes/header.php';
                     </p>
 
                     <?php
+                    // Auto-calculate defaults from basic salary
+                    $basic = (float)$sel_emp['basic_salary'];
+                    $default_credit = round($basic * $CREDIT_RATE, 2);  // 10% of basic
+                    $default_gerd   = round($basic * $GERD_RATE,   2);  // 1% of basic
+
                     $ded_fields = [
-                        ['credit_association', 'Credit Association',   'fas fa-handshake',    'var(--info)',    'Monthly credit association contribution'],
-                        ['renaissance_dam',    'Renaissance Dam (GERD)','fas fa-water',       'var(--primary)', 'Grand Ethiopian Renaissance Dam contribution'],
-                        ['loan_repayment',     'Loan Repayment',       'fas fa-hand-holding-usd','var(--warning)', 'Monthly loan installment'],
-                        ['penalty',            'Penalty / Absence',    'fas fa-exclamation-triangle','var(--danger)', 'Penalty or absence deduction'],
-                        ['other',              'Other Deduction',      'fas fa-minus-circle', 'var(--gray-600)', 'Any other deduction'],
+                        ['credit_association', 'Credit Association (10% of basic)',    'fas fa-handshake',         'var(--info)',     'Default: 10% of basic salary',   $default_credit],
+                        ['renaissance_dam',    'Renaissance Dam — GERD (1% of basic)', 'fas fa-water',             'var(--primary)', 'Default: 1% of basic salary',    $default_gerd],
+                        ['loan_repayment',     'Loan Repayment',                       'fas fa-hand-holding-usd',  'var(--warning)', 'Monthly loan installment',       0],
+                        ['penalty',            'Penalty / Absence',                    'fas fa-exclamation-triangle','var(--danger)', 'Penalty or absence deduction',  0],
+                        ['other',              'Other Deduction',                      'fas fa-minus-circle',      'var(--gray-600)','Any other deduction',            0],
                     ];
-                    foreach ($ded_fields as [$fname, $flabel, $ficon, $fcolor, $fhint]):
-                        $cur_val = $sel_ded[$fname] ?? 0;
+                    foreach ($ded_fields as [$fname, $flabel, $ficon, $fcolor, $fhint, $fdefault]):
+                        // Use saved value if record exists, otherwise use default
+                        $cur_val = isset($sel_ded[$fname]) ? (float)$sel_ded[$fname] : $fdefault;
                     ?>
                     <div class="form-group" style="margin-bottom:12px;">
-                        <label class="form-label" style="display:flex;align-items:center;gap:6px;">
-                            <i class="<?= $ficon ?>" style="color:<?= $fcolor ?>;width:16px;"></i>
-                            <?= $flabel ?> (ETB)
+                        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
+                            <span style="display:flex;align-items:center;gap:6px;">
+                                <i class="<?= $ficon ?>" style="color:<?= $fcolor ?>;width:16px;"></i>
+                                <?= $flabel ?> (ETB)
+                            </span>
+                            <?php if ($fdefault > 0): ?>
+                            <span style="font-size:0.72rem;color:<?= $fcolor ?>;font-weight:600;
+                                         background:<?= $fcolor ?>18;padding:2px 8px;border-radius:10px;cursor:pointer;"
+                                  onclick="document.getElementById('<?= $fname ?>').value='<?= number_format($fdefault,2,'.','') ?>'; updateTotal();"
+                                  title="Click to reset to default">
+                                Default: ETB <?= number_format($fdefault, 2) ?>
+                            </span>
+                            <?php endif; ?>
                         </label>
                         <input type="number" name="<?= $fname ?>" id="<?= $fname ?>"
                                class="form-control ded-input"
-                               value="<?= number_format((float)$cur_val, 2, '.', '') ?>"
+                               value="<?= number_format($cur_val, 2, '.', '') ?>"
                                min="0" step="0.01" placeholder="0.00">
                         <span class="form-hint"><?= $fhint ?></span>
                     </div>
@@ -324,13 +349,18 @@ require_once $depth . 'includes/header.php';
                                 (Pension 7% + Income Tax calculated separately during payroll)
                             </p>
                         </div>
+                        <?php
+                        // Show current total (saved or defaults)
+                        $display_total = isset($sel_ded)
+                            ? (($sel_ded['credit_association'] ?? 0) +
+                               ($sel_ded['renaissance_dam']    ?? 0) +
+                               ($sel_ded['loan_repayment']     ?? 0) +
+                               ($sel_ded['penalty']            ?? 0) +
+                               ($sel_ded['other']              ?? 0))
+                            : ($default_credit + $default_gerd);
+                        ?>
                         <p id="totalDed" style="font-size:1.4rem;font-weight:800;color:var(--danger);margin:0;">
-                            ETB <?= number_format(
-                                ($sel_ded['credit_association'] ?? 0) +
-                                ($sel_ded['renaissance_dam']    ?? 0) +
-                                ($sel_ded['loan_repayment']     ?? 0) +
-                                ($sel_ded['penalty']            ?? 0) +
-                                ($sel_ded['other']              ?? 0), 2) ?>
+                            ETB <?= number_format($display_total, 2) ?>
                         </p>
                     </div>
                 </div>

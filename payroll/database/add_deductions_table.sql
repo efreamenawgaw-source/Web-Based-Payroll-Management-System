@@ -31,3 +31,8 @@ CREATE TABLE IF NOT EXISTS deductions (
     CONSTRAINT fk_ded_created FOREIGN KEY (created_by) REFERENCES users(user_id)    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Per-employee deductions: Credit Association, Renaissance Dam, Loan, Penalty, Other';
+
+-- Add deduction rates to system_settings
+INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES
+('credit_association_rate', '0.10', 'Credit Association deduction rate (10% of basic salary)'),
+('renaissance_dam_rate',    '0.01', 'Renaissance Dam (GERD) deduction rate (1% of basic salary)');
