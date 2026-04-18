@@ -14,6 +14,9 @@
 <a href="<?= $depth ?>pages/hr/allowances.php" class="<?= $a==='allowances'?'active':'' ?>">
     <i class="fas fa-hand-holding-usd nav-icon"></i> Manage Allowances
 </a>
+<a href="<?= $depth ?>pages/hr/deductions.php" class="<?= $a==='deductions'?'active':'' ?>">
+    <i class="fas fa-minus-circle nav-icon"></i> Manage Deductions
+</a>
 <a href="<?= $depth ?>pages/hr/status.php" class="<?= $a==='status'?'active':'' ?>">
     <i class="fas fa-toggle-on nav-icon"></i> Employee Status
 </a>
