@@ -1,19 +1,159 @@
 <?php
+session_start();
 $page_title = 'Generate Payslips';
 $active_nav = 'payslip';
 $depth      = '../../';
+require_once $depth . 'database/db_connect.php';
 
+$pdo     = getDB();
 $success = '';
 $error   = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
-    $period = $_POST['period'] ?? '';
-    if (empty($period)) {
-        $error = 'Please select a verified payroll period.';
-    } else {
-        $success = 'Payslips generated successfully for all 135 employees — ' . htmlspecialchars($period) . '. Employees can now view and download their payslips.';
+// ── Load verified periods ──────────────────────────────────
+$periods = $pdo->query("
+    SELECT pp.period_id, pp.period_label, pp.period_month, pp.period_year,
+           pp.status, COUNT(pr.record_id) AS emp_count,
+           SUM(pr.net_pay) AS total_net,
+           COUNT(ps.payslip_id) AS payslips_generated
+    FROM   payroll_periods pp
+    LEFT JOIN payroll_records pr ON pp.period_id = pr.period_id
+    LEFT JOIN payslips ps        ON pp.period_id = ps.period_id
+    WHERE  pp.status IN ('verified','finalized')
+    GROUP  BY pp.period_id
+    ORDER  BY pp.period_year DESC, pp.period_month DESC
+")->fetchAll();
+
+// ── Selected period ────────────────────────────────────────
+$sel_period_id = (int)($_GET['period_id'] ?? ($_POST['period_id'] ?? 0));
+$sel_period    = null;
+$records       = [];
+
+if ($sel_period_id) {
+    $sp = $pdo->prepare("SELECT * FROM payroll_periods WHERE period_id = ?");
+    $sp->execute([$sel_period_id]);
+    $sel_period = $sp->fetch();
+
+    if ($sel_period) {
+        $rec_stmt = $pdo->prepare("
+            SELECT pr.*,
+                   e.full_name, e.email, e.phone,
+                   e.basic_salary AS emp_basic,
+                   d.dept_name, e.position,
+                   ps.payslip_id, ps.generated_at
+            FROM   payroll_records pr
+            JOIN   employees e   ON pr.emp_id = e.emp_id
+            JOIN   departments d ON e.dept_id = d.dept_id
+            LEFT JOIN payslips ps ON ps.record_id = pr.record_id
+            WHERE  pr.period_id = ?
+            ORDER  BY e.full_name
+        ");
+        $rec_stmt->execute([$sel_period_id]);
+        $records = $rec_stmt->fetchAll();
     }
 }
+
+// ── GENERATE PAYSLIPS ──────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
+    $pid = (int)($_POST['period_id'] ?? 0);
+    if ($pid) {
+        try {
+            $pdo->beginTransaction();
+
+            // Get all records for this period
+            $recs = $pdo->prepare("SELECT record_id, emp_id FROM payroll_records WHERE period_id = ?");
+            $recs->execute([$pid]);
+            $all_records = $recs->fetchAll();
+
+            $generated = 0;
+            foreach ($all_records as $rec) {
+                // Check if payslip already exists
+                $chk = $pdo->prepare("SELECT payslip_id FROM payslips WHERE record_id = ?");
+                $chk->execute([$rec['record_id']]);
+                if (!$chk->fetch()) {
+                    $pdo->prepare("
+                        INSERT INTO payslips (record_id, emp_id, period_id, generated_by)
+                        VALUES (?, ?, ?, ?)
+                    ")->execute([$rec['record_id'], $rec['emp_id'], $pid, $_SESSION['user_id']]);
+                    $generated++;
+                }
+            }
+
+            // Update period status to finalized
+            $pdo->prepare("
+                UPDATE payroll_periods SET status = 'finalized', finalized_at = NOW()
+                WHERE period_id = ?
+            ")->execute([$pid]);
+
+            // Audit log
+            $pdo->prepare("
+                INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
+                VALUES (?, ?, ?, 'Generate Payslip', ?, ?, ?)
+            ")->execute([
+                $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
+                "period_id:{$pid}",
+                "Generated {$generated} payslips",
+                $_SERVER['REMOTE_ADDR'] ?? null
+            ]);
+
+            $pdo->commit();
+            $success = "<strong>{$generated} payslips</strong> generated successfully. Employees can now view and download their payslips.";
+
+            // Reload records
+            $rec_stmt->execute([$pid]);
+            $records = $rec_stmt->fetchAll();
+            $sp->execute([$pid]);
+            $sel_period = $sp->fetch();
+
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            $error = 'Generation failed: ' . $e->getMessage();
+        }
+    }
+}
+
+// ── VIEW SINGLE PAYSLIP ────────────────────────────────────
+$view_record = null;
+if (!empty($_GET['view'])) {
+    $vr = $pdo->prepare("
+        SELECT pr.*,
+               e.full_name, e.email, e.phone, e.position, e.employment_date,
+               d.dept_name,
+               pp.period_label, pp.period_month, pp.period_year,
+               ps.generated_at,
+               COALESCE(wd.working_days, 30) AS working_days
+        FROM   payroll_records pr
+        JOIN   employees e   ON pr.emp_id = e.emp_id
+        JOIN   departments d ON e.dept_id = d.dept_id
+        JOIN   payroll_periods pp ON pr.period_id = pp.period_id
+        LEFT JOIN payslips ps ON ps.record_id = pr.record_id
+        LEFT JOIN working_days wd ON wd.emp_id = pr.emp_id
+            AND wd.period_month = pp.period_month
+            AND wd.period_year  = pp.period_year
+        WHERE  pr.record_id = ?
+    ");
+    $vr->execute([(int)$_GET['view']]);
+    $view_record = $vr->fetch();
+
+    // Also fetch deductions breakdown
+    $ded_view = null;
+    if ($view_record) {
+        $dv = $pdo->prepare("
+            SELECT * FROM deductions
+            WHERE emp_id = ? AND effective_month = ? AND effective_year = ?
+        ");
+        $dv->execute([
+            $view_record['emp_id'],
+            $view_record['period_month'],
+            $view_record['period_year']
+        ]);
+        $ded_view = $dv->fetch();
+    }
+}
+
+$status_badge = [
+    'verified'  => 'badge-success',
+    'finalized' => 'badge-primary',
+];
 
 require_once $depth . 'includes/header.php';
 ?>
@@ -28,102 +168,195 @@ require_once $depth . 'includes/header.php';
         <p>Generate electronic payslips for all employees after payroll verification.</p>
     </div>
     <a href="verify_payroll.php" class="btn btn-secondary">
-        <i class="fas fa-check-double"></i> Verify Payroll First
+        <i class="fas fa-check-double"></i> Verify Payroll
     </a>
 </div>
 
 <?php if ($success): ?>
-<div class="alert alert-success"><i class="fas fa-check-circle"></i> <?= $success ?></div>
+<div class="alert alert-success"><i class="fas fa-check-circle"></i> <span><?= $success ?></span></div>
 <?php endif; ?>
 <?php if ($error): ?>
-<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= $error ?></div>
+<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <span><?= htmlspecialchars($error) ?></span></div>
 <?php endif; ?>
 
-<!-- Generate Form -->
-<div class="card mb-3">
-    <div class="card-header">
-        <h3><i class="fas fa-file-invoice-dollar" style="color:var(--primary);margin-right:8px"></i>Generate Payslips</h3>
-    </div>
-    <div class="card-body">
-        <form method="POST" action="">
-            <div class="form-row" style="align-items:flex-end;">
-                <div class="form-group">
-                    <label class="form-label">Select Verified Period <span style="color:var(--danger)">*</span></label>
-                    <select name="period" class="form-control" required>
-                        <option value="">-- Select Period --</option>
-                        <option value="June 2023">June 2023 — ✅ Verified</option>
-                        <option value="May 2023">May 2023 — ✅ Verified</option>
-                        <option value="April 2023">April 2023 — ✅ Verified</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Generate For</label>
-                    <select name="scope" class="form-control">
-                        <option value="all">All Employees (135)</option>
-                        <option value="academic">Academic Staff Only</option>
-                        <option value="admin">Administrative Staff Only</option>
-                    </select>
-                </div>
-                <div class="form-group" style="padding-bottom:18px;">
-                    <button type="submit" name="generate" class="btn btn-primary">
-                        <i class="fas fa-file-invoice-dollar"></i> Generate Payslips
-                    </button>
-                </div>
-            </div>
-        </form>
+<div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-        <!-- Prerequisite Info -->
-        <div class="alert alert-info" style="margin-top:8px;">
-            <i class="fas fa-info-circle"></i>
-            <div>
-                <strong>Prerequisites:</strong> Payroll must be <strong>verified and approved</strong> before payslips can be generated.
-                Once generated, employees can view and download their payslips from their dashboard.
+    <!-- ── Verified Periods ── -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-list" style="color:var(--primary);margin-right:8px"></i>
+                Verified Periods
+            </h3>
+        </div>
+        <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th>Employees</th>
+                            <th>Payslips</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($periods)): ?>
+                        <tr>
+                            <td colspan="5" class="text-center text-muted" style="padding:24px;">
+                                No verified payrolls yet.
+                                <a href="verify_payroll.php">Verify payroll first.</a>
+                            </td>
+                        </tr>
+                        <?php else: ?>
+                        <?php foreach ($periods as $p): ?>
+                        <tr style="<?= $sel_period_id === (int)$p['period_id'] ? 'background:var(--bg-light);' : '' ?>">
+                            <td><strong><?= htmlspecialchars($p['period_label']) ?></strong></td>
+                            <td><?= $p['emp_count'] ?></td>
+                            <td>
+                                <?php if ($p['payslips_generated'] > 0): ?>
+                                <span class="badge badge-success"><?= $p['payslips_generated'] ?> generated</span>
+                                <?php else: ?>
+                                <span class="badge badge-gray">None yet</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <span class="badge <?= $status_badge[$p['status']] ?? 'badge-gray' ?>">
+                                    <?= ucfirst($p['status']) ?>
+                                </span>
+                            </td>
+                            <td>
+                                <a href="generate_payslip.php?period_id=<?= $p['period_id'] ?>"
+                                   class="btn btn-secondary btn-sm btn-icon-only" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+
+    <!-- ── Generate Action ── -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-file-invoice-dollar" style="color:var(--primary);margin-right:8px"></i>
+                <?= $sel_period ? htmlspecialchars($sel_period['period_label']) : 'Select a Period' ?>
+            </h3>
+        </div>
+        <div class="card-body">
+            <?php if ($sel_period): ?>
+            <div style="margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-200);">
+                    <span style="color:var(--gray-600);">Period</span>
+                    <strong><?= htmlspecialchars($sel_period['period_label']) ?></strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-200);">
+                    <span style="color:var(--gray-600);">Employees</span>
+                    <strong><?= count($records) ?></strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-200);">
+                    <span style="color:var(--gray-600);">Status</span>
+                    <span class="badge <?= $status_badge[$sel_period['status']] ?? 'badge-gray' ?>">
+                        <?= ucfirst($sel_period['status']) ?>
+                    </span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:8px 0;">
+                    <span style="color:var(--gray-600);">Total Net Pay</span>
+                    <strong style="color:var(--success);">
+                        ETB <?= number_format(array_sum(array_column($records, 'net_pay')), 2) ?>
+                    </strong>
+                </div>
+            </div>
+
+            <?php
+            $already_generated = count(array_filter($records, fn($r) => $r['payslip_id']));
+            ?>
+
+            <?php if ($already_generated === count($records) && count($records) > 0): ?>
+            <div class="alert alert-success" style="margin-bottom:12px;">
+                <i class="fas fa-check-circle"></i>
+                All <?= $already_generated ?> payslips already generated.
+            </div>
+            <?php elseif ($sel_period['status'] === 'verified' || $sel_period['status'] === 'finalized'): ?>
+            <form method="POST" action="">
+                <input type="hidden" name="period_id" value="<?= $sel_period['period_id'] ?>">
+                <button type="submit" name="generate" class="btn btn-primary w-100"
+                        onclick="return confirm('Generate payslips for all <?= count($records) ?> employees?')">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    Generate <?= count($records) - $already_generated ?> Payslips
+                </button>
+            </form>
+            <?php endif; ?>
+
+            <?php else: ?>
+            <div class="empty-state">
+                <div class="empty-icon"><i class="fas fa-mouse-pointer"></i></div>
+                <p>Select a verified period from the list.</p>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
 </div>
 
-<!-- Payslip Status by Period -->
-<div class="card mb-3">
+<!-- ── Payslips List ── -->
+<?php if ($sel_period && !empty($records)): ?>
+<div class="card">
     <div class="card-header">
-        <h3><i class="fas fa-history" style="color:var(--primary);margin-right:8px"></i>Payslip Generation History</h3>
+        <h3><i class="fas fa-file-invoice" style="color:var(--primary);margin-right:8px"></i>
+            Payslips — <?= htmlspecialchars($sel_period['period_label']) ?>
+        </h3>
+        <span class="badge badge-primary"><?= count($records) ?> employees</span>
     </div>
     <div class="card-body" style="padding:0">
         <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
-                        <th>Period</th>
-                        <th>Payroll Status</th>
-                        <th>Payslips Generated</th>
-                        <th>Generated On</th>
-                        <th>Generated By</th>
-                        <th>Actions</th>
+                        <th>#</th>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Gross (ETB)</th>
+                        <th>Total Ded. (ETB)</th>
+                        <th>Net Pay (ETB)</th>
+                        <th>Payslip</th>
+                        <th>View</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php
-                    $history = [
-                        ['June 2023',     'Verified',   '135 / 135', '2023-06-23', 'Finance Officer', true],
-                        ['May 2023',      'Verified',   '133 / 133', '2023-05-28', 'Finance Officer', true],
-                        ['April 2023',    'Verified',   '130 / 130', '2023-04-28', 'Finance Officer', true],
-                        ['March 2023',    'Verified',   '130 / 130', '2023-03-28', 'Finance Officer', true],
-                        ['February 2023', 'Verified',   '128 / 128', '2023-02-25', 'Finance Officer', true],
-                    ];
-                    foreach ($history as $h): ?>
+                    <?php $i = 1; foreach ($records as $r): ?>
                     <tr>
-                        <td><strong><?= $h[0] ?></strong></td>
-                        <td><span class="badge badge-success"><?= $h[1] ?></span></td>
-                        <td><span class="badge badge-primary"><?= $h[2] ?></span></td>
-                        <td class="text-muted"><?= $h[3] ?></td>
-                        <td class="text-muted"><?= $h[4] ?></td>
+                        <td class="text-muted"><?= $i++ ?></td>
                         <td>
-                            <button class="btn btn-secondary btn-sm" title="View Payslips">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                            <button class="btn btn-primary btn-sm" title="Download All">
-                                <i class="fas fa-download"></i> Download All
-                            </button>
+                            <strong><?= htmlspecialchars($r['full_name']) ?></strong>
+                            <br><small class="text-muted"><?= htmlspecialchars($r['emp_id']) ?></small>
+                        </td>
+                        <td style="font-size:0.82rem;"><?= htmlspecialchars($r['dept_name']) ?></td>
+                        <td><?= number_format($r['gross_salary'], 2) ?></td>
+                        <td style="color:var(--danger);">
+                            <?= number_format($r['income_tax'] + $r['pension_employee'] + $r['other_deductions'], 2) ?>
+                        </td>
+                        <td class="text-bold" style="color:var(--success);"><?= number_format($r['net_pay'], 2) ?></td>
+                        <td>
+                            <?php if ($r['payslip_id']): ?>
+                            <span class="badge badge-success">
+                                <i class="fas fa-check"></i> Generated
+                            </span>
+                            <?php else: ?>
+                            <span class="badge badge-gray">Pending</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($r['payslip_id']): ?>
+                            <a href="generate_payslip.php?period_id=<?= $sel_period_id ?>&view=<?= $r['record_id'] ?>"
+                               class="btn btn-secondary btn-sm btn-icon-only" title="View Payslip">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -132,47 +365,181 @@ require_once $depth . 'includes/header.php';
         </div>
     </div>
 </div>
+<?php endif; ?>
 
-<!-- Sample Payslip Preview -->
-<div class="card">
-    <div class="card-header">
-        <h3><i class="fas fa-eye" style="color:var(--primary);margin-right:8px"></i>Sample Payslip Preview — June 2023</h3>
-        <button class="btn btn-primary btn-sm" onclick="openModal('payslipPreview')">
-            <i class="fas fa-expand"></i> Full Preview
-        </button>
-    </div>
-    <div class="card-body">
-        <div style="max-width:560px;margin:0 auto;border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden;">
-            <!-- Payslip Header -->
-            <div style="background:var(--primary);color:white;padding:20px;text-align:center;">
-                <div style="font-size:1.5rem;font-weight:900;letter-spacing:-1px;">BiT</div>
-                <div style="font-weight:700;font-size:1rem;">Bahir Dar Institute of Technology</div>
-                <div style="font-size:0.85rem;opacity:0.85;">PAYSLIP — JUNE 2023</div>
+<!-- ── Payslip Modal ── -->
+<?php if ($view_record): ?>
+<div class="modal-overlay active" id="payslipModal">
+    <div class="modal" style="max-width:640px;">
+        <div class="modal-header">
+            <h3>
+                <i class="fas fa-file-invoice-dollar" style="color:var(--primary);margin-right:8px"></i>
+                Payslip — <?= htmlspecialchars($view_record['period_label']) ?>
+            </h3>
+            <a href="generate_payslip.php?period_id=<?= $sel_period_id ?>"
+               class="modal-close" style="text-decoration:none;">&times;</a>
+        </div>
+        <div class="modal-body" id="payslipPrint">
+
+            <!-- Header -->
+            <div style="text-align:center;padding:16px;background:var(--primary);border-radius:var(--radius);margin-bottom:16px;">
+                <div style="font-size:1.6rem;font-weight:900;color:var(--white);letter-spacing:-1px;">BiT</div>
+                <div style="font-weight:700;font-size:1rem;color:var(--white);">Bahir Dar Institute of Technology</div>
+                <div style="font-size:0.82rem;color:rgba(255,255,255,0.80);">
+                    PAYSLIP — <?= strtoupper(htmlspecialchars($view_record['period_label'])) ?>
+                </div>
             </div>
+
             <!-- Employee Info -->
-            <div style="padding:16px;background:var(--bg-light);display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                <div><p style="font-size:0.72rem;color:var(--gray-400);margin:0;">Employee Name</p><p style="font-weight:600;margin:0;">Admasu Dejene</p></div>
-                <div><p style="font-size:0.72rem;color:var(--gray-400);margin:0;">Employee ID</p><p style="font-weight:600;margin:0;">EMP-101</p></div>
-                <div><p style="font-size:0.72rem;color:var(--gray-400);margin:0;">Department</p><p style="font-weight:600;margin:0;">Faculty of Computing</p></div>
-                <div><p style="font-size:0.72rem;color:var(--gray-400);margin:0;">Position</p><p style="font-weight:600;margin:0;">Lecturer</p></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;
+                        background:var(--bg-light);padding:14px;border-radius:var(--radius);margin-bottom:16px;">
+                <?php
+                $info_rows = [
+                    ['Employee Name', $view_record['full_name']],
+                    ['Employee ID',   $view_record['emp_id']],
+                    ['Department',    $view_record['dept_name']],
+                    ['Position',      $view_record['position']],
+                    ['Working Days',  $view_record['working_days'] . ' / 30'],
+                    ['Pay Period',    $view_record['period_label']],
+                ];
+                foreach ($info_rows as $ir): ?>
+                <div>
+                    <p style="font-size:0.7rem;color:var(--gray-400);margin:0;text-transform:uppercase;"><?= $ir[0] ?></p>
+                    <p style="font-weight:600;margin:0;font-size:0.88rem;"><?= htmlspecialchars($ir[1]) ?></p>
+                </div>
+                <?php endforeach; ?>
             </div>
-            <!-- Earnings & Deductions -->
-            <div style="padding:16px;">
-                <table style="width:100%;font-size:0.85rem;border-collapse:collapse;">
-                    <tr style="background:var(--bg-light);"><th style="padding:8px;text-align:left;color:var(--primary);">Earnings</th><th style="padding:8px;text-align:right;color:var(--primary);">ETB</th></tr>
-                    <tr><td style="padding:7px 8px;">Basic Salary</td><td style="padding:7px 8px;text-align:right;">12,500.00</td></tr>
-                    <tr><td style="padding:7px 8px;">Housing Allowance</td><td style="padding:7px 8px;text-align:right;">1,000.00</td></tr>
-                    <tr><td style="padding:7px 8px;">Transport Allowance</td><td style="padding:7px 8px;text-align:right;">500.00</td></tr>
-                    <tr style="font-weight:700;background:var(--bg-light);"><td style="padding:8px;">Gross Salary</td><td style="padding:8px;text-align:right;color:var(--primary);">14,000.00</td></tr>
-                    <tr style="background:var(--bg-light);"><th style="padding:8px;text-align:left;color:var(--danger);">Deductions</th><th style="padding:8px;text-align:right;color:var(--danger);">ETB</th></tr>
-                    <tr><td style="padding:7px 8px;">Employee Pension (7%)</td><td style="padding:7px 8px;text-align:right;color:var(--warning);">875.00</td></tr>
-                    <tr><td style="padding:7px 8px;">Income Tax (2025 Brackets)</td><td style="padding:7px 8px;text-align:right;color:var(--danger);">2,587.50</td></tr>
-                    <tr style="font-weight:700;background:var(--success-light);"><td style="padding:10px 8px;color:var(--success);">NET PAY</td><td style="padding:10px 8px;text-align:right;color:var(--success);font-size:1.1rem;">10,537.50</td></tr>
-                </table>
-                <p style="font-size:0.72rem;color:var(--gray-400);text-align:center;margin-top:10px;">Employer Pension (11%): ETB 1,375.00 — paid by BiT</p>
+
+            <!-- Earnings -->
+            <table style="width:100%;font-size:0.875rem;border-collapse:collapse;margin-bottom:4px;">
+                <tr style="background:var(--bg-light);">
+                    <th style="padding:8px 12px;text-align:left;color:var(--primary);font-size:0.78rem;text-transform:uppercase;">Earnings</th>
+                    <th style="padding:8px 12px;text-align:right;color:var(--primary);font-size:0.78rem;text-transform:uppercase;">ETB</th>
+                </tr>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">Basic Salary</td>
+                    <td style="padding:8px 12px;text-align:right;"><?= number_format($view_record['basic_salary'], 2) ?></td>
+                </tr>
+                <?php if ($view_record['housing'] > 0): ?>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">Housing Allowance</td>
+                    <td style="padding:8px 12px;text-align:right;"><?= number_format($view_record['housing'], 2) ?></td>
+                </tr>
+                <?php endif; ?>
+                <?php if ($view_record['transport'] > 0): ?>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">Transport Allowance</td>
+                    <td style="padding:8px 12px;text-align:right;"><?= number_format($view_record['transport'], 2) ?></td>
+                </tr>
+                <?php endif; ?>
+                <?php if ($view_record['position_allowance'] > 0): ?>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">Position Allowance</td>
+                    <td style="padding:8px 12px;text-align:right;"><?= number_format($view_record['position_allowance'], 2) ?></td>
+                </tr>
+                <?php endif; ?>
+                <?php if ($view_record['teaching'] > 0): ?>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">Teaching Allowance</td>
+                    <td style="padding:8px 12px;text-align:right;"><?= number_format($view_record['teaching'], 2) ?></td>
+                </tr>
+                <?php endif; ?>
+                <tr style="background:var(--bg-light);font-weight:700;border-bottom:2px solid var(--accent-light);">
+                    <td style="padding:9px 12px;">Gross Earnings</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--success);"><?= number_format($view_record['gross_salary'], 2) ?></td>
+                </tr>
+
+                <!-- Deductions -->
+                <tr style="background:var(--bg-light);">
+                    <th style="padding:8px 12px;text-align:left;color:var(--danger);font-size:0.78rem;text-transform:uppercase;">Deductions</th>
+                    <th style="padding:8px 12px;text-align:right;color:var(--danger);font-size:0.78rem;text-transform:uppercase;">ETB</th>
+                </tr>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">
+                        Income Tax
+                        <span style="font-size:0.72rem;color:var(--gray-400);">
+                            (<?= htmlspecialchars($view_record['tax_bracket'] ?? '') ?> bracket)
+                        </span>
+                    </td>
+                    <td style="padding:8px 12px;text-align:right;color:var(--danger);"><?= number_format($view_record['income_tax'], 2) ?></td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">Employee Pension (7% of basic)</td>
+                    <td style="padding:8px 12px;text-align:right;color:var(--warning);"><?= number_format($view_record['pension_employee'], 2) ?></td>
+                </tr>
+                <?php if ($ded_view && $ded_view['credit_association'] > 0): ?>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">Credit Association (10%)</td>
+                    <td style="padding:8px 12px;text-align:right;color:var(--info);"><?= number_format($ded_view['credit_association'], 2) ?></td>
+                </tr>
+                <?php endif; ?>
+                <?php if ($ded_view && $ded_view['renaissance_dam'] > 0): ?>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">Renaissance Dam — GERD (1%)</td>
+                    <td style="padding:8px 12px;text-align:right;color:var(--info);"><?= number_format($ded_view['renaissance_dam'], 2) ?></td>
+                </tr>
+                <?php endif; ?>
+                <?php if ($ded_view && $ded_view['loan_repayment'] > 0): ?>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">Loan Repayment</td>
+                    <td style="padding:8px 12px;text-align:right;color:var(--warning);"><?= number_format($ded_view['loan_repayment'], 2) ?></td>
+                </tr>
+                <?php endif; ?>
+                <?php if ($ded_view && ($ded_view['penalty'] + $ded_view['other']) > 0): ?>
+                <tr style="border-bottom:1px solid var(--gray-200);">
+                    <td style="padding:8px 12px;">Penalty / Other</td>
+                    <td style="padding:8px 12px;text-align:right;color:var(--danger);"><?= number_format($ded_view['penalty'] + $ded_view['other'], 2) ?></td>
+                </tr>
+                <?php endif; ?>
+
+                <!-- Net Pay -->
+                <tr style="background:var(--success-light);font-weight:700;">
+                    <td style="padding:12px;color:var(--success);font-size:1rem;">NET PAY</td>
+                    <td style="padding:12px;text-align:right;color:var(--success);font-size:1.2rem;"><?= number_format($view_record['net_pay'], 2) ?></td>
+                </tr>
+            </table>
+
+            <!-- Employer pension note -->
+            <div style="margin-top:10px;padding:10px 12px;background:var(--info-light);border-radius:var(--radius);
+                        font-size:0.78rem;color:var(--info);text-align:center;">
+                <i class="fas fa-shield-alt"></i>
+                Employer Pension (11% of basic): <strong>ETB <?= number_format($view_record['pension_employer'], 2) ?></strong> — paid by BiT
             </div>
+            <div style="margin-top:6px;font-size:0.7rem;color:var(--gray-400);text-align:center;">
+                Generated: <?= $view_record['generated_at'] ? date('M d, Y H:i', strtotime($view_record['generated_at'])) : date('M d, Y H:i') ?>
+                &nbsp;|&nbsp; Tax: Revised Monthly Employment Tax Brackets 2025
+            </div>
+        </div>
+        <div class="modal-footer">
+            <a href="generate_payslip.php?period_id=<?= $sel_period_id ?>" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Close
+            </a>
+            <button class="btn btn-primary" onclick="printPayslip()">
+                <i class="fas fa-print"></i> Print / Download
+            </button>
         </div>
     </div>
 </div>
+<?php endif; ?>
+
+<script>
+function printPayslip() {
+    const content = document.getElementById('payslipPrint').innerHTML;
+    const win = window.open('', '_blank', 'width=700,height=900');
+    win.document.write(`
+        <html><head><title>Payslip</title>
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #263238; }
+            table { width:100%; border-collapse:collapse; }
+            th, td { padding: 8px 12px; }
+            @media print { body { padding: 0; } }
+        </style></head>
+        <body>${content}</body></html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
+}
+</script>
 
 <?php require_once $depth . 'includes/footer.php'; ?>

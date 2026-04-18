@@ -17,6 +17,9 @@
 <a href="<?= $depth ?>pages/hr/deductions.php" class="<?= $a==='deductions'?'active':'' ?>">
     <i class="fas fa-minus-circle nav-icon"></i> Manage Deductions
 </a>
+<a href="<?= $depth ?>pages/hr/working_days.php" class="<?= $a==='working_days'?'active':'' ?>">
+    <i class="fas fa-calendar-check nav-icon"></i> Working Days
+</a>
 <a href="<?= $depth ?>pages/hr/status.php" class="<?= $a==='status'?'active':'' ?>">
     <i class="fas fa-toggle-on nav-icon"></i> Employee Status
 </a>

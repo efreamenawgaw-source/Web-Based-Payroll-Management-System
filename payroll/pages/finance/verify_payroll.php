@@ -1,18 +1,143 @@
 <?php
+session_start();
 $page_title = 'Verify Payroll';
 $active_nav = 'verify';
 $depth      = '../../';
+require_once $depth . 'database/db_connect.php';
 
+$pdo     = getDB();
 $success = '';
 $error   = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['approve'])) {
-        $success = 'Payroll for ' . htmlspecialchars($_POST['period'] ?? '') . ' has been verified and approved. Payslips can now be generated.';
-    } elseif (isset($_POST['reject'])) {
-        $error = 'Payroll for ' . htmlspecialchars($_POST['period'] ?? '') . ' has been marked as "Not Verified" and sent back for re-processing.';
+// ── Load processed periods ─────────────────────────────────
+$periods = $pdo->query("
+    SELECT pp.period_id, pp.period_label, pp.period_month, pp.period_year,
+           pp.status, pp.processed_at,
+           u.full_name AS processed_by_name,
+           COUNT(pr.record_id) AS emp_count,
+           SUM(pr.gross_salary) AS total_gross,
+           SUM(pr.net_pay)      AS total_net
+    FROM   payroll_periods pp
+    LEFT JOIN users u          ON pp.processed_by = u.user_id
+    LEFT JOIN payroll_records pr ON pp.period_id = pr.period_id
+    WHERE  pp.status IN ('processed','verified','finalized')
+    GROUP  BY pp.period_id
+    ORDER  BY pp.period_year DESC, pp.period_month DESC
+")->fetchAll();
+
+// ── Selected period ────────────────────────────────────────
+$sel_period_id = (int)($_GET['period_id'] ?? ($_POST['period_id'] ?? 0));
+$sel_period    = null;
+$records       = [];
+
+if ($sel_period_id) {
+    $sp = $pdo->prepare("SELECT * FROM payroll_periods WHERE period_id = ?");
+    $sp->execute([$sel_period_id]);
+    $sel_period = $sp->fetch();
+
+    if ($sel_period) {
+        $rec_stmt = $pdo->prepare("
+            SELECT pr.*,
+                   e.full_name, e.basic_salary AS emp_basic,
+                   d.dept_name
+            FROM   payroll_records pr
+            JOIN   employees e  ON pr.emp_id = e.emp_id
+            JOIN   departments d ON e.dept_id = d.dept_id
+            WHERE  pr.period_id = ?
+            ORDER  BY e.full_name
+        ");
+        $rec_stmt->execute([$sel_period_id]);
+        $records = $rec_stmt->fetchAll();
     }
 }
+
+// ── HANDLE APPROVE ─────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
+    $pid = (int)($_POST['period_id'] ?? 0);
+    if ($pid) {
+        try {
+            $pdo->prepare("
+                UPDATE payroll_periods
+                SET status = 'verified', verified_by = ?, verified_at = NOW()
+                WHERE period_id = ? AND status = 'processed'
+            ")->execute([$_SESSION['user_id'], $pid]);
+
+            $pdo->prepare("
+                INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
+                VALUES (?, ?, ?, 'Verify Payroll', ?, 'Payroll approved and verified', ?)
+            ")->execute([
+                $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
+                "period_id:{$pid}", $_SERVER['REMOTE_ADDR'] ?? null
+            ]);
+
+            $success = 'Payroll verified and approved. '
+                     . '<a href="generate_payslip.php?period_id=' . $pid . '" class="btn btn-primary btn-sm" style="margin-left:10px;">'
+                     . '<i class="fas fa-file-invoice-dollar"></i> Generate Payslips</a>';
+
+            // Reload
+            $sp->execute([$pid]);
+            $sel_period = $pdo->prepare("SELECT * FROM payroll_periods WHERE period_id=?")->execute([$pid])
+                        ? ($pdo->prepare("SELECT * FROM payroll_periods WHERE period_id=?")->execute([$pid]) ? null : null)
+                        : null;
+            $sp2 = $pdo->prepare("SELECT * FROM payroll_periods WHERE period_id=?");
+            $sp2->execute([$pid]);
+            $sel_period = $sp2->fetch();
+
+        } catch (PDOException $e) {
+            $error = 'Approval failed: ' . $e->getMessage();
+        }
+    }
+}
+
+// ── HANDLE REJECT ──────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reject'])) {
+    $pid    = (int)($_POST['period_id'] ?? 0);
+    $reason = trim($_POST['reject_reason'] ?? '');
+    if ($pid) {
+        try {
+            $pdo->prepare("
+                UPDATE payroll_periods
+                SET status = 'pending', notes = ?
+                WHERE period_id = ?
+            ")->execute([$reason ?: 'Rejected by Finance', $pid]);
+
+            $pdo->prepare("
+                INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
+                VALUES (?, ?, ?, 'Reject Payroll', ?, ?, ?)
+            ")->execute([
+                $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
+                "period_id:{$pid}", 'Rejected: ' . ($reason ?: 'No reason given'),
+                $_SERVER['REMOTE_ADDR'] ?? null
+            ]);
+
+            $error = 'Payroll rejected and sent back for re-processing. Reason: ' . htmlspecialchars($reason ?: 'Not specified');
+            $sel_period['status'] = 'pending';
+
+        } catch (PDOException $e) {
+            $error = 'Rejection failed: ' . $e->getMessage();
+        }
+    }
+}
+
+// ── Grand totals ───────────────────────────────────────────
+$gt = [];
+if (!empty($records)) {
+    $gt = [
+        'gross'            => array_sum(array_column($records, 'gross_salary')),
+        'income_tax'       => array_sum(array_column($records, 'income_tax')),
+        'pension_emp'      => array_sum(array_column($records, 'pension_employee')),
+        'pension_org'      => array_sum(array_column($records, 'pension_employer')),
+        'other_deductions' => array_sum(array_column($records, 'other_deductions')),
+        'net_pay'          => array_sum(array_column($records, 'net_pay')),
+    ];
+}
+
+$status_badge = [
+    'pending'   => 'badge-gray',
+    'processed' => 'badge-warning',
+    'verified'  => 'badge-success',
+    'finalized' => 'badge-primary',
+];
 
 require_once $depth . 'includes/header.php';
 ?>
@@ -24,7 +149,7 @@ require_once $depth . 'includes/header.php';
 <div class="page-header d-flex justify-between align-center">
     <div>
         <h1>Verify Payroll</h1>
-        <p>Review and verify processed payroll data before generating payslips.</p>
+        <p>Review processed payroll data and approve or reject before generating payslips.</p>
     </div>
     <a href="process_payroll.php" class="btn btn-secondary">
         <i class="fas fa-arrow-left"></i> Back to Process
@@ -32,171 +157,208 @@ require_once $depth . 'includes/header.php';
 </div>
 
 <?php if ($success): ?>
-<div class="alert alert-success"><i class="fas fa-check-circle"></i> <?= $success ?></div>
+<div class="alert alert-success"><i class="fas fa-check-circle"></i> <span><?= $success ?></span></div>
 <?php endif; ?>
 <?php if ($error): ?>
-<div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> <?= $error ?></div>
+<div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> <span><?= $error ?></span></div>
 <?php endif; ?>
 
-<!-- Period Selection -->
-<div class="card mb-3">
-    <div class="card-header">
-        <h3><i class="fas fa-calendar-check" style="color:var(--primary);margin-right:8px"></i>Select Payroll Period to Verify</h3>
-    </div>
-    <div class="card-body">
-        <div class="filter-bar">
-            <select class="form-control" style="width:auto;">
-                <option selected>June 2023 — Processed</option>
-                <option>May 2023 — Verified</option>
-                <option>April 2023 — Verified</option>
-            </select>
-            <button class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Load Payroll</button>
-        </div>
-
-        <!-- Status Banner -->
-        <div style="margin-top:16px;padding:14px 18px;background:var(--warning-light);border-radius:var(--radius);border-left:4px solid var(--warning);display:flex;align-items:center;gap:12px;">
-            <i class="fas fa-clock" style="color:var(--warning);font-size:1.3rem;"></i>
-            <div>
-                <p style="font-weight:700;color:var(--warning);margin:0;">Pending Verification — June 2023</p>
-                <p style="font-size:0.82rem;color:var(--gray-600);margin:0;">Processed on 2023-06-23 13:55 by Finance Officer. Awaiting your review.</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Payroll Summary -->
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
+
+    <!-- ── Processed Periods List ── -->
     <div class="card">
         <div class="card-header">
-            <h3><i class="fas fa-chart-pie" style="color:var(--primary);margin-right:8px"></i>Payroll Summary — June 2023</h3>
+            <h3><i class="fas fa-list" style="color:var(--primary);margin-right:8px"></i>
+                Payroll Periods
+            </h3>
         </div>
-        <div class="card-body">
-            <?php
-            $summary = [
-                ['Total Employees Processed', '135',          'var(--primary)'],
-                ['Total Gross Salary',        'ETB 1,687,500','var(--primary)'],
-                ['Total Employee Pension (7%)','ETB 118,125', 'var(--warning)'],
-                ['Total Employer Pension (11%)','ETB 185,625','var(--info)'],
-                ['Total Income Tax',          'ETB 284,985',  'var(--danger)'],
-                ['Total Net Pay',             'ETB 1,284,390','var(--success)'],
-            ];
-            foreach ($summary as $s): ?>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--gray-200);">
-                <span style="font-size:0.875rem;color:var(--gray-600);"><?= $s[0] ?></span>
-                <span style="font-weight:700;color:<?= $s[2] ?>;"><?= $s[1] ?></span>
+        <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th>Employees</th>
+                            <th>Total Net Pay</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($periods)): ?>
+                        <tr>
+                            <td colspan="5" class="text-center text-muted" style="padding:24px;">
+                                No processed payrolls yet.
+                                <a href="process_payroll.php">Process payroll first.</a>
+                            </td>
+                        </tr>
+                        <?php else: ?>
+                        <?php foreach ($periods as $p): ?>
+                        <tr style="<?= $sel_period_id === (int)$p['period_id'] ? 'background:var(--bg-light);' : '' ?>">
+                            <td><strong><?= htmlspecialchars($p['period_label']) ?></strong></td>
+                            <td><?= $p['emp_count'] ?></td>
+                            <td class="text-bold text-success">
+                                ETB <?= number_format($p['total_net'], 2) ?>
+                            </td>
+                            <td>
+                                <span class="badge <?= $status_badge[$p['status']] ?? 'badge-gray' ?>">
+                                    <?= ucfirst($p['status']) ?>
+                                </span>
+                            </td>
+                            <td>
+                                <a href="verify_payroll.php?period_id=<?= $p['period_id'] ?>"
+                                   class="btn btn-secondary btn-sm btn-icon-only" title="Review">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
-            <?php endforeach; ?>
         </div>
     </div>
 
-    <!-- Verification Checklist -->
+    <!-- ── Period Summary ── -->
     <div class="card">
         <div class="card-header">
-            <h3><i class="fas fa-clipboard-check" style="color:var(--primary);margin-right:8px"></i>Verification Checklist</h3>
+            <h3><i class="fas fa-chart-pie" style="color:var(--primary);margin-right:8px"></i>
+                <?= $sel_period ? htmlspecialchars($sel_period['period_label']) . ' — Summary' : 'Select a Period' ?>
+            </h3>
+            <?php if ($sel_period): ?>
+            <span class="badge <?= $status_badge[$sel_period['status']] ?? 'badge-gray' ?>">
+                <?= ucfirst($sel_period['status']) ?>
+            </span>
+            <?php endif; ?>
         </div>
         <div class="card-body">
+            <?php if ($sel_period && !empty($gt)): ?>
             <?php
-            $checks = [
-                ['All active employees included (135/135)',    true],
-                ['Pension rates applied correctly (7% / 11%)', true],
-                ['Ethiopian tax brackets applied',             true],
-                ['No negative net pay values',                 true],
-                ['Allowances correctly added to gross',        true],
-                ['No duplicate payroll entries',               true],
-                ['Period matches selected month',              true],
+            $summary_rows = [
+                ['Employees Processed', count($records),                    'var(--primary)'],
+                ['Total Gross Earnings', 'ETB ' . number_format($gt['gross'], 2),       'var(--primary)'],
+                ['Total Income Tax',     'ETB ' . number_format($gt['income_tax'], 2),  'var(--danger)'],
+                ['Total Pension (7%)',   'ETB ' . number_format($gt['pension_emp'], 2), 'var(--warning)'],
+                ['Total Pension (11%)',  'ETB ' . number_format($gt['pension_org'], 2), 'var(--info)'],
+                ['Other Deductions',     'ETB ' . number_format($gt['other_deductions'], 2), 'var(--gray-600)'],
+                ['Total Net Pay',        'ETB ' . number_format($gt['net_pay'], 2),     'var(--success)'],
             ];
-            foreach ($checks as $c): ?>
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-200);">
-                <i class="fas <?= $c[1] ? 'fa-check-circle' : 'fa-times-circle' ?>"
-                   style="color:<?= $c[1] ? 'var(--success)' : 'var(--danger)' ?>;font-size:1.1rem;"></i>
-                <span style="font-size:0.875rem;"><?= $c[0] ?></span>
+            foreach ($summary_rows as $sr): ?>
+            <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--gray-200);">
+                <span style="font-size:0.875rem;color:var(--gray-600);"><?= $sr[0] ?></span>
+                <span style="font-weight:700;color:<?= $sr[2] ?>;"><?= $sr[1] ?></span>
             </div>
             <?php endforeach; ?>
 
-            <div style="margin-top:16px;padding:12px;background:var(--success-light);border-radius:var(--radius);text-align:center;">
-                <i class="fas fa-check-circle" style="color:var(--success);font-size:1.5rem;"></i>
-                <p style="color:var(--success);font-weight:700;margin:6px 0 0;">All checks passed — Ready for approval</p>
+            <!-- Approve / Reject -->
+            <?php if ($sel_period['status'] === 'processed'): ?>
+            <div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">
+                <form method="POST" action="">
+                    <input type="hidden" name="period_id" value="<?= $sel_period['period_id'] ?>">
+                    <button type="submit" name="approve" class="btn btn-success w-100"
+                            onclick="return confirm('Approve and finalize this payroll?')">
+                        <i class="fas fa-check-double"></i> Approve & Verify
+                    </button>
+                </form>
+                <form method="POST" action="">
+                    <input type="hidden" name="period_id" value="<?= $sel_period['period_id'] ?>">
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <input type="text" name="reject_reason" class="form-control"
+                               placeholder="Reason for rejection (optional)">
+                    </div>
+                    <button type="submit" name="reject" class="btn btn-danger w-100"
+                            onclick="return confirm('Reject and send back for re-processing?')">
+                        <i class="fas fa-times"></i> Reject — Send Back
+                    </button>
+                </form>
             </div>
+            <?php elseif ($sel_period['status'] === 'verified'): ?>
+            <div style="margin-top:18px;">
+                <a href="generate_payslip.php?period_id=<?= $sel_period['period_id'] ?>"
+                   class="btn btn-primary w-100">
+                    <i class="fas fa-file-invoice-dollar"></i> Generate Payslips
+                </a>
+            </div>
+            <?php endif; ?>
+
+            <?php else: ?>
+            <div class="empty-state">
+                <div class="empty-icon"><i class="fas fa-mouse-pointer"></i></div>
+                <p>Select a period from the list to review.</p>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
+
 </div>
 
-<!-- Detailed Payroll Table -->
+<!-- ── Detailed Records Table ── -->
+<?php if ($sel_period && !empty($records)): ?>
 <div class="card">
     <div class="card-header">
-        <h3><i class="fas fa-table" style="color:var(--primary);margin-right:8px"></i>Detailed Payroll Review — June 2023</h3>
-        <span class="badge badge-warning">Pending Verification</span>
+        <h3><i class="fas fa-table" style="color:var(--primary);margin-right:8px"></i>
+            Payroll Detail — <?= htmlspecialchars($sel_period['period_label']) ?>
+        </h3>
+        <button class="btn btn-secondary btn-sm" onclick="window.print()">
+            <i class="fas fa-print"></i> Print
+        </button>
     </div>
     <div class="card-body" style="padding:0">
         <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
-                        <th>Emp ID</th>
-                        <th>Name</th>
+                        <th>#</th>
+                        <th>Employee</th>
+                        <th>Department</th>
                         <th>Basic (ETB)</th>
                         <th>Gross (ETB)</th>
-                        <th>Pension 7% (ETB)</th>
                         <th>Tax (ETB)</th>
+                        <th>Pension 7% (ETB)</th>
+                        <th>Other Ded. (ETB)</th>
                         <th>Net Pay (ETB)</th>
-                        <th>Check</th>
+                        <th>Bracket</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php
-                    // Revised 2025 tax brackets
-                    function verifyCalcTax(float $taxable): float {
-                        if ($taxable <= 2000)  return 0.00;
-                        if ($taxable <= 4000)  return ($taxable * 0.15) - 300.00;
-                        if ($taxable <= 7000)  return ($taxable * 0.20) - 500.00;
-                        if ($taxable <= 10000) return ($taxable * 0.25) - 850.00;
-                        if ($taxable <= 14000) return ($taxable * 0.30) - 1350.00;
-                        return ($taxable * 0.35) - 2050.00;
-                    }
-                    $payroll = [
-                        ['EMP-101','Admasu Dejene',  12500, 14000],
-                        ['EMP-102','Bekele Abebe',   15200, 17900],
-                        ['EMP-103','Chaltu Kebede',  9800,  11000],
-                        ['EMP-104','Dawit Solomon',  11000, 12700],
-                        ['EMP-105','Eleni Tadesse',  13500, 15600],
-                    ];
-                    foreach ($payroll as $p):
-                        $gross       = $p[3];
-                        $pension_emp = round($p[2] * 0.07, 2);
-                        $taxable     = round($gross - $pension_emp, 2);
-                        $tax         = round(verifyCalcTax($taxable), 2);
-                        $net         = round($taxable - $tax, 2);
-                    ?>
+                    <?php $i = 1; foreach ($records as $r): ?>
                     <tr>
-                        <td><span class="badge badge-primary"><?= $p[0] ?></span></td>
-                        <td><strong><?= $p[1] ?></strong></td>
-                        <td><?= number_format($p[2], 2) ?></td>
-                        <td><?= number_format($gross, 2) ?></td>
-                        <td class="text-warning"><?= number_format($pension_emp, 2) ?></td>
-                        <td class="text-danger"><?= number_format($tax, 2) ?></td>
-                        <td class="text-bold text-success"><?= number_format($net, 2) ?></td>
-                        <td><i class="fas fa-check-circle" style="color:var(--success);"></i></td>
+                        <td class="text-muted"><?= $i++ ?></td>
+                        <td>
+                            <strong><?= htmlspecialchars($r['full_name']) ?></strong>
+                            <br><small class="text-muted"><?= htmlspecialchars($r['emp_id']) ?></small>
+                        </td>
+                        <td style="font-size:0.82rem;"><?= htmlspecialchars($r['dept_name']) ?></td>
+                        <td><?= number_format($r['basic_salary'], 2) ?></td>
+                        <td class="text-bold" style="color:var(--success);"><?= number_format($r['gross_salary'], 2) ?></td>
+                        <td style="color:var(--danger);"><?= number_format($r['income_tax'], 2) ?></td>
+                        <td style="color:var(--warning);"><?= number_format($r['pension_employee'], 2) ?></td>
+                        <td style="color:var(--gray-600);"><?= number_format($r['other_deductions'], 2) ?></td>
+                        <td class="text-bold" style="color:var(--success);font-size:1rem;"><?= number_format($r['net_pay'], 2) ?></td>
+                        <td>
+                            <span class="badge <?= $r['tax_bracket'] === '0%' ? 'badge-success' : 'badge-warning' ?>">
+                                <?= htmlspecialchars($r['tax_bracket'] ?? '—') ?>
+                            </span>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
+                <tfoot>
+                    <tr style="background:var(--bg-light);font-weight:700;">
+                        <td colspan="4" style="padding:12px 16px;color:var(--primary);">TOTALS</td>
+                        <td style="padding:12px 16px;color:var(--success);"><?= number_format($gt['gross'], 2) ?></td>
+                        <td style="padding:12px 16px;color:var(--danger);"><?= number_format($gt['income_tax'], 2) ?></td>
+                        <td style="padding:12px 16px;color:var(--warning);"><?= number_format($gt['pension_emp'], 2) ?></td>
+                        <td style="padding:12px 16px;color:var(--gray-600);"><?= number_format($gt['other_deductions'], 2) ?></td>
+                        <td style="padding:12px 16px;color:var(--success);"><?= number_format($gt['net_pay'], 2) ?></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
-
-    <!-- Approve / Reject Actions -->
-    <div class="card-footer">
-        <form method="POST" action="" style="display:flex;gap:12px;justify-content:flex-end;">
-            <input type="hidden" name="period" value="June 2023">
-            <button type="submit" name="reject" class="btn btn-danger"
-                onclick="return confirm('Reject this payroll and send back for re-processing?')">
-                <i class="fas fa-times"></i> Reject — Send Back
-            </button>
-            <button type="submit" name="approve" class="btn btn-success"
-                onclick="return confirm('Approve and finalize this payroll? Payslips will be generated.')">
-                <i class="fas fa-check-double"></i> Approve & Finalize
-            </button>
-        </form>
-    </div>
 </div>
+<?php endif; ?>
 
 <?php require_once $depth . 'includes/footer.php'; ?>

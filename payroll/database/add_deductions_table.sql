@@ -36,3 +36,27 @@ CREATE TABLE IF NOT EXISTS deductions (
 INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES
 ('credit_association_rate', '0.10', 'Credit Association deduction rate (10% of basic salary)'),
 ('renaissance_dam_rate',    '0.01', 'Renaissance Dam (GERD) deduction rate (1% of basic salary)');
+
+-- ============================================================
+-- Add working_days table
+-- HR enters working days per employee per period before payroll
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS working_days (
+    wd_id           INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    emp_id          VARCHAR(20)     NOT NULL,
+    period_month    TINYINT         NOT NULL,   -- 1–12
+    period_year     SMALLINT        NOT NULL,
+    working_days    TINYINT         NOT NULL DEFAULT 30,  -- actual days worked
+    notes           VARCHAR(200)             DEFAULT NULL,
+    submitted_by    INT UNSIGNED             DEFAULT NULL,  -- FK → users (HR)
+    submitted_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                             ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (wd_id),
+    UNIQUE  KEY uq_wd_emp_period (emp_id, period_month, period_year),
+    INDEX   idx_wd_period (period_year, period_month),
+    CONSTRAINT fk_wd_emp  FOREIGN KEY (emp_id)        REFERENCES employees(emp_id) ON DELETE CASCADE,
+    CONSTRAINT fk_wd_user FOREIGN KEY (submitted_by)  REFERENCES users(user_id)    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='HR-submitted working days per employee per payroll period';
