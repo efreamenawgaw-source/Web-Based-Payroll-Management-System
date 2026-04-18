@@ -36,10 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($user && $user['is_active'] && password_verify($password, $user['password'])) {
             // ── Successful login ──────────────────────────────
-            $_SESSION['user_id']  = $user['user_id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role']     = $user['role'];
-            $_SESSION['name']     = $user['full_name'];
+            $_SESSION['user_id']       = $user['user_id'];
+            $_SESSION['username']      = $user['username'];
+            $_SESSION['role']          = $user['role'];
+            $_SESSION['name']          = $user['full_name'];
+            $_SESSION['profile_photo'] = $user['profile_photo'] ?? null;
 
             // Update last_login
             $pdo->prepare("UPDATE users SET last_login = NOW() WHERE user_id = ?")

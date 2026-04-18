@@ -19,3 +19,8 @@
 <a href="<?= $depth ?>pages/finance/reports.php" class="<?= $a==='reports'?'active':'' ?>">
     <i class="fas fa-chart-bar nav-icon"></i> Payroll Reports
 </a>
+
+<span class="nav-section-label">Account</span>
+<a href="<?= $depth ?>pages/profile/my_profile.php" class="<?= $a==='my_profile'?'active':'' ?>">
+    <i class="fas fa-user-edit nav-icon"></i> My Profile
+</a>

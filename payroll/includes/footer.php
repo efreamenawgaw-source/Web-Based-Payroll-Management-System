@@ -92,18 +92,112 @@ document.addEventListener('keydown', function(e) {
 });
 
 /* ============================================================
-   Back to top button (dashboard pages)
+   Notifications — real-time polling
    ============================================================ */
-(function() {
-    var btn = document.getElementById('backToTop');
-    if (!btn) return;
-    window.addEventListener('scroll', function() {
-        btn.classList.toggle('visible', window.scrollY > 400);
-    });
-    btn.addEventListener('click', function() {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-})();
+const NOTIF_API = '<?= $depth ?>api/notifications.php';
+
+function loadNotifications() {
+    fetch(NOTIF_API)
+        .then(r => r.json())
+        .then(data => {
+            const badge = document.getElementById('notifCount');
+            const list  = document.getElementById('notifList');
+            if (!badge || !list) return;
+
+            // Update badge
+            if (data.count > 0) {
+                badge.textContent = data.count > 9 ? '9+' : data.count;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+
+            // Render list
+            if (!data.notifications || data.notifications.length === 0) {
+                list.innerHTML = `
+                    <div style="padding:32px;text-align:center;color:var(--gray-400);">
+                        <i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.4;display:block;margin-bottom:8px;"></i>
+                        <p style="margin:0;font-size:0.85rem;">No notifications</p>
+                    </div>`;
+                return;
+            }
+
+            const typeColors = {
+                success: 'var(--success)', info: 'var(--info)',
+                warning: 'var(--warning)', danger: 'var(--danger)'
+            };
+            const typeIcons = {
+                success: 'fa-check-circle', info: 'fa-info-circle',
+                warning: 'fa-exclamation-triangle', danger: 'fa-times-circle'
+            };
+
+            list.innerHTML = data.notifications.map(n => `
+                <div onclick="markRead(${n.notif_id}, this)"
+                     style="padding:12px 16px;border-bottom:1px solid var(--gray-200);
+                            cursor:pointer;display:flex;gap:12px;align-items:flex-start;
+                            background:${n.is_read == 1 ? 'var(--white)' : 'var(--bg-light)'};
+                            transition:background 0.2s;"
+                     onmouseover="this.style.background='var(--bg-light)'"
+                     onmouseout="this.style.background='${n.is_read == 1 ? 'var(--white)' : 'var(--bg-light)'}'">
+                    <div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;
+                                background:${typeColors[n.type] || 'var(--info)'}20;
+                                display:flex;align-items:center;justify-content:center;">
+                        <i class="fas ${typeIcons[n.type] || 'fa-info-circle'}"
+                           style="color:${typeColors[n.type] || 'var(--info)'};font-size:0.9rem;"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <p style="font-weight:${n.is_read == 1 ? '500' : '700'};
+                                  font-size:0.85rem;margin:0 0 2px;color:var(--gray-800);">
+                            ${n.title}
+                        </p>
+                        <p style="font-size:0.78rem;color:var(--gray-600);margin:0 0 3px;
+                                  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            ${n.message}
+                        </p>
+                        <p style="font-size:0.7rem;color:var(--gray-400);margin:0;">${n.time_ago}</p>
+                    </div>
+                    ${n.is_read == 0 ? '<div style="width:8px;height:8px;border-radius:50%;background:var(--primary);flex-shrink:0;margin-top:4px;"></div>' : ''}
+                </div>
+            `).join('');
+        })
+        .catch(() => {});
+}
+
+function markRead(id, el) {
+    const fd = new FormData();
+    fd.append('action', 'mark_read');
+    fd.append('notif_id', id);
+    fetch(NOTIF_API, { method: 'POST', body: fd })
+        .then(() => loadNotifications());
+}
+
+function markAllRead() {
+    const fd = new FormData();
+    fd.append('action', 'mark_all_read');
+    fetch(NOTIF_API, { method: 'POST', body: fd })
+        .then(() => loadNotifications());
+}
+
+function toggleNotifPanel() {
+    const panel = document.getElementById('notifPanel');
+    if (!panel) return;
+    const isOpen = panel.style.display === 'flex';
+    panel.style.display = isOpen ? 'none' : 'flex';
+    if (!isOpen) loadNotifications();
+}
+
+// Close panel when clicking outside
+document.addEventListener('click', function(e) {
+    const panel = document.getElementById('notifPanel');
+    const btn   = document.getElementById('notifBtn');
+    if (panel && btn && !panel.contains(e.target) && !btn.contains(e.target)) {
+        panel.style.display = 'none';
+    }
+});
+
+// Poll every 30 seconds
+loadNotifications();
+setInterval(loadNotifications, 30000);
 </script>
 </body>
 </html>

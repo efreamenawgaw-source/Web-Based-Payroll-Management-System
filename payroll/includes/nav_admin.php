@@ -19,3 +19,8 @@
 <a href="<?= $depth ?>pages/admin/settings.php" class="<?= $a==='settings'?'active':'' ?>">
     <i class="fas fa-cog nav-icon"></i> Settings
 </a>
+
+<span class="nav-section-label">Account</span>
+<a href="<?= $depth ?>pages/profile/my_profile.php" class="<?= $a==='my_profile'?'active':'' ?>">
+    <i class="fas fa-user-edit nav-icon"></i> My Profile
+</a>

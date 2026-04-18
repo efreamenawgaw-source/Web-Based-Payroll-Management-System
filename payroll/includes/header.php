@@ -8,13 +8,21 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: ../../pages/auth/login.php');
     exit();
 }
-$role       = $_SESSION['role']     ?? 'employee';
-$user_name  = $_SESSION['name']     ?? 'User';
-$username   = $_SESSION['username'] ?? '';
+$role       = $_SESSION['role']          ?? 'employee';
+$user_name  = $_SESSION['name']          ?? 'User';
+$username   = $_SESSION['username']      ?? '';
 $initials   = strtoupper(substr($user_name, 0, 1));
-$page_title = $page_title ?? 'Dashboard';
-$active_nav = $active_nav ?? '';
-$depth      = $depth      ?? '../../';
+$page_title = $page_title               ?? 'Dashboard';
+$active_nav = $active_nav               ?? '';
+$depth      = $depth                    ?? '../../';
+
+// ── Dynamic web root (handles spaces in folder names) ─────
+$_script    = str_replace('\\', '/', $_SERVER['SCRIPT_NAME']);
+$_web_root  = rtrim(dirname(dirname(dirname($_script))), '/');
+$_uploads_web = $_web_root . '/assets/uploads/profiles/';
+$_photo_url = !empty($_SESSION['profile_photo'])
+    ? $_uploads_web . rawurlencode($_SESSION['profile_photo'])
+    : null;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -51,7 +59,14 @@ $depth      = $depth      ?? '../../';
 
         <!-- User Info -->
         <div class="sidebar-user">
+            <?php if ($_photo_url): ?>
+            <img src="<?= htmlspecialchars($_photo_url) ?>"
+                 alt="Photo"
+                 style="width:38px;height:38px;border-radius:50%;object-fit:cover;
+                        flex-shrink:0;border:2px solid var(--accent-light);">
+            <?php else: ?>
             <div class="user-avatar"><?= $initials ?></div>
+            <?php endif; ?>
             <div class="user-info">
                 <p><?= htmlspecialchars($user_name) ?></p>
                 <span><?= ucfirst($role) ?></span>
@@ -88,18 +103,46 @@ $depth      = $depth      ?? '../../';
                 </div>
             </div>
             <div class="topbar-right">
-                <div class="topbar-badge">
-                    <button class="btn-icon" title="Notifications">
+                <!-- Notifications Bell -->
+                <div class="topbar-badge" style="position:relative;">
+                    <button class="btn-icon" id="notifBtn" title="Notifications"
+                            onclick="toggleNotifPanel()">
                         <i class="fas fa-bell"></i>
                     </button>
-                    <span class="badge">3</span>
+                    <span class="badge" id="notifCount" style="display:none;">0</span>
                 </div>
-                <div class="topbar-user-chip">
+
+                <!-- User chip → My Profile -->
+                <a href="<?= $depth ?>pages/profile/my_profile.php"
+                   class="topbar-user-chip" style="text-decoration:none;" title="My Profile">
+                    <?php if ($_photo_url): ?>
+                    <img src="<?= htmlspecialchars($_photo_url) ?>"
+                         alt="Photo"
+                         style="width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+                    <?php else: ?>
                     <div class="topbar-avatar"><?= $initials ?></div>
+                    <?php endif; ?>
                     <span class="topbar-username"><?= htmlspecialchars($user_name) ?></span>
-                </div>
+                </a>
             </div>
         </header>
+
+        <!-- Notification Panel -->
+        <div id="notifPanel" style="display:none;position:fixed;top:62px;right:16px;
+             width:340px;max-height:480px;background:var(--white);border-radius:var(--radius-lg);
+             box-shadow:var(--shadow-lg);border:1px solid var(--gray-200);z-index:95;
+             overflow:hidden;flex-direction:column;">
+            <div style="padding:14px 16px;border-bottom:1px solid var(--gray-200);
+                        display:flex;justify-content:space-between;align-items:center;">
+                <h4 style="margin:0;font-size:0.95rem;">Notifications</h4>
+                <button onclick="markAllRead()"
+                        style="background:none;border:none;cursor:pointer;
+                               font-size:0.78rem;color:var(--primary);font-weight:600;">
+                    Mark all read
+                </button>
+            </div>
+            <div id="notifList" style="overflow-y:auto;max-height:380px;"></div>
+        </div>
 
         <!-- Page Content starts here -->
         <main class="page-content">
