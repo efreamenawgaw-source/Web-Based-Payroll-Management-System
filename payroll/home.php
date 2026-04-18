@@ -55,7 +55,7 @@
                 Bahir Dar Institute of Technology
             </div>
             <h1 class="hero-title">
-                Smart Payroll<br>
+                Web-Based Payroll<br>
                 <span class="hero-highlight">Management System</span>
             </h1>
             <p class="hero-desc">

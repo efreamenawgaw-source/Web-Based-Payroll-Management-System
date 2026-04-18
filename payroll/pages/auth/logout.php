@@ -1,20 +1,31 @@
 <?php
 session_start();
 
-// Log the logout action before destroying session
+// Log the logout action — wrapped in try/catch so logout always works
 if (isset($_SESSION['user_id'])) {
-    require_once '../../database/db_connect.php';
-    $pdo = getDB();
-    $pdo->prepare("
-        INSERT INTO audit_logs
-            (user_id, username, role, action, details, ip_address, status)
-        VALUES (?, ?, ?, 'Logout', 'User logged out', ?, 'success')
-    ")->execute([
-        $_SESSION['user_id'],
-        $_SESSION['username'] ?? '',
-        $_SESSION['role']     ?? '',
-        $_SERVER['REMOTE_ADDR'] ?? 'unknown'
-    ]);
+    try {
+        require_once '../../database/db_connect.php';
+        $pdo = getDB();
+
+        // Verify user still exists before logging
+        $chk = $pdo->prepare("SELECT user_id FROM users WHERE user_id = ?");
+        $chk->execute([$_SESSION['user_id']]);
+
+        if ($chk->fetch()) {
+            $pdo->prepare("
+                INSERT INTO audit_logs
+                    (user_id, username, role, action, details, ip_address, status)
+                VALUES (?, ?, ?, 'Logout', 'User logged out', ?, 'success')
+            ")->execute([
+                $_SESSION['user_id'],
+                $_SESSION['username'] ?? '',
+                $_SESSION['role']     ?? '',
+                $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+            ]);
+        }
+    } catch (Exception $e) {
+        // Silently ignore — logout must always succeed
+    }
 }
 
 // Destroy session completely
