@@ -302,11 +302,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payroll'])) {
                 $ded_s->execute([$emp['emp_id'], $period_month, $period_year]);
                 $ded = $ded_s->fetch();
 
-                $credit_assoc = $ded ? (float)$ded['credit_association'] : 0;
-                $gerd         = $ded ? (float)$ded['renaissance_dam']    : 0;
-                $loan         = $ded ? (float)$ded['loan_repayment']     : 0;
-                $penalty      = $ded ? (float)$ded['penalty']            : 0;
-                $other_ded    = $ded ? (float)$ded['other']              : 0;
+                // ── Apply defaults: Credit 10%, GERD 1% of basic ──
+                $credit_assoc = ($ded && (float)$ded['credit_association'] > 0)
+                    ? (float)$ded['credit_association']
+                    : round($basic * 0.10, 2);   // DEFAULT 10%
+
+                $gerd         = ($ded && (float)$ded['renaissance_dam'] > 0)
+                    ? (float)$ded['renaissance_dam']
+                    : round($basic * 0.01, 2);   // DEFAULT 1%
+
+                $loan      = $ded ? (float)$ded['loan_repayment'] : 0;
+                $penalty   = $ded ? (float)$ded['penalty']        : 0;
+                $other_ded = $ded ? (float)$ded['other']          : 0;
+
                 $other_deductions = round($credit_assoc + $gerd + $loan + $penalty + $other_ded, 2);
                 $total_deductions = round($income_tax + $pension_emp + $other_deductions, 2);
                 $net_pay          = round($gross - $total_deductions, 2);
@@ -494,9 +502,17 @@ require_once $depth . 'includes/header.php';
                     <strong style="color:var(--info);">Pension (Org)</strong><br>
                     11% × Basic Salary
                 </div>
+                <div style="padding:8px 12px;background:var(--white);border-radius:6px;border-left:3px solid var(--info);">
+                    <strong style="color:var(--info);">Credit Association</strong><br>
+                    10% × Basic (default, HR can override)
+                </div>
+                <div style="padding:8px 12px;background:var(--white);border-radius:6px;border-left:3px solid var(--info);">
+                    <strong style="color:var(--info);">Renaissance Dam (GERD)</strong><br>
+                    1% × Basic (default, HR can override)
+                </div>
                 <div style="padding:8px 12px;background:var(--white);border-radius:6px;border-left:3px solid var(--gray-600);">
                     <strong style="color:var(--gray-600);">Net Pay</strong><br>
-                    Gross − Tax − Pension(7%) − Other Ded.
+                    Gross − Tax − Pension(7%) − Credit(10%) − GERD(1%) − Other
                 </div>
             </div>
         </div>
@@ -616,8 +632,12 @@ require_once $depth . 'includes/header.php';
                     <tr>
                         <th style="background:var(--danger-light);color:var(--danger);">Income Tax</th>
                         <th style="background:var(--warning-light);color:var(--warning);">Pension 7%</th>
-                        <th style="background:var(--info-light);color:var(--info);">Credit Assoc.</th>
-                        <th style="background:var(--info-light);color:var(--info);">GERD</th>
+                        <th style="background:var(--info-light);color:var(--info);">Credit Assoc.
+                            <br><span style="font-weight:400;font-size:0.65rem;">(10% default)</span>
+                        </th>
+                        <th style="background:var(--info-light);color:var(--info);">GERD
+                            <br><span style="font-weight:400;font-size:0.65rem;">(1% default)</span>
+                        </th>
                         <th style="background:var(--warning-light);color:var(--warning);">Loan</th>
                         <th style="background:var(--danger-light);color:var(--danger);">Penalty/Other</th>
                     </tr>
@@ -649,14 +669,10 @@ require_once $depth . 'includes/header.php';
                         <td style="color:var(--danger);"><?= number_format($r['income_tax'], 2) ?></td>
                         <td style="color:var(--warning);"><?= number_format($r['pension_emp'], 2) ?></td>
                         <td style="color:var(--info);">
-                            <?= $r['credit_assoc'] > 0
-                                ? number_format($r['credit_assoc'], 2)
-                                : '<span class="text-muted">—</span>' ?>
+                            <?= number_format($r['credit_assoc'], 2) ?>
                         </td>
                         <td style="color:var(--info);">
-                            <?= $r['gerd'] > 0
-                                ? number_format($r['gerd'], 2)
-                                : '<span class="text-muted">—</span>' ?>
+                            <?= number_format($r['gerd'], 2) ?>
                         </td>
                         <td style="color:var(--warning);">
                             <?= $r['loan'] > 0
