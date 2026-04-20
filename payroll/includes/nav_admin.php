@@ -19,6 +19,9 @@
 <a href="<?= $depth ?>pages/admin/settings.php" class="<?= $a==='settings'?'active':'' ?>">
     <i class="fas fa-cog nav-icon"></i> Settings
 </a>
+<a href="<?= $depth ?>pages/admin/email_settings.php" class="<?= $a==='email_settings'?'active':'' ?>">
+    <i class="fas fa-envelope nav-icon"></i> Email Settings
+</a>
 
 <span class="nav-section-label">Account</span>
 <a href="<?= $depth ?>pages/profile/my_profile.php" class="<?= $a==='my_profile'?'active':'' ?>">

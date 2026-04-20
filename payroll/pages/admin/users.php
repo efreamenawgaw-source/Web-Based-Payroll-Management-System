@@ -5,6 +5,7 @@ $active_nav = 'users';
 $depth      = '../../';
 require_once $depth . 'database/db_connect.php';
 require_once $depth . 'includes/notify.php';
+require_once $depth . 'includes/mailer.php';
 
 $pdo     = getDB();
 $success = '';
@@ -55,7 +56,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
 
             $success = "User <strong>{$full_name}</strong> ({$username}) created successfully.";
 
-            // Notify the new user
+            // Send welcome email if user has an email address
+            if ($email) {
+                $login_url = (isset($_SERVER['HTTPS']) ? 'https' : 'http')
+                           . '://' . $_SERVER['HTTP_HOST']
+                           . dirname(dirname($_SERVER['SCRIPT_NAME']))
+                           . '/auth/login.php';
+
+                $html = buildWelcomeEmail($full_name, $username, $password, $role, $login_url);
+                $mail_result = sendMail($email, $full_name,
+                    'Welcome to BiT Payroll System — Your Account Details',
+                    $html);
+
+                if ($mail_result['success']) {
+                    $success .= ' <span style="color:var(--success);">✉️ Welcome email sent to ' . htmlspecialchars($email) . '</span>';
+                } else {
+                    $success .= ' <span style="color:var(--warning);">⚠️ Email not sent: ' . htmlspecialchars($mail_result['error']) . '</span>';
+                }
+            }
+
+            // Notify the new user (in-app)
             notify($pdo, (int)$new_id,
                 'Welcome to BiT Payroll System',
                 "Your account has been created. Username: {$username} | Role: " . ucfirst($role) . ". Login to get started.",
@@ -108,6 +128,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
             ]);
 
             $success = "User <strong>{$full_name}</strong> updated successfully.";
+
+            // Send password reset email if password was changed
+            if ($new_pass && strlen($new_pass) >= 6 && $email) {
+                $login_url = (isset($_SERVER['HTTPS']) ? 'https' : 'http')
+                           . '://' . $_SERVER['HTTP_HOST']
+                           . dirname(dirname($_SERVER['SCRIPT_NAME']))
+                           . '/auth/login.php';
+
+                // Get username for the email
+                $uname_stmt = $pdo->prepare("SELECT username FROM users WHERE user_id=?");
+                $uname_stmt->execute([$uid]);
+                $uname_row = $uname_stmt->fetch();
+
+                $html = buildPasswordResetEmail($full_name, $uname_row['username'] ?? '', $new_pass, $login_url);
+                $mail_result = sendMail($email, $full_name,
+                    'BiT Payroll System — Your Password Has Been Reset',
+                    $html);
+
+                if ($mail_result['success']) {
+                    $success .= ' <span style="color:var(--success);">✉️ Password reset email sent.</span>';
+                } else {
+                    $success .= ' <span style="color:var(--warning);">⚠️ Email not sent: ' . htmlspecialchars($mail_result['error']) . '</span>';
+                }
+            }
         } catch (PDOException $e) {
             $error = 'Update failed: ' . $e->getMessage();
         }
@@ -412,11 +456,33 @@ require_once $depth . 'includes/header.php';
         </div>
         <form method="POST" action="">
             <div class="modal-body">
+
+                <!-- Email notice -->
+                <div style="background:var(--success-light);border-radius:var(--radius);
+                            padding:10px 14px;margin-bottom:16px;font-size:0.82rem;
+                            color:var(--success);border-left:4px solid var(--success);">
+                    <i class="fas fa-envelope"></i>
+                    <strong>Welcome email</strong> with username &amp; password will be sent
+                    automatically to the employee's Gmail address.
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">Full Name <span style="color:var(--danger)">*</span></label>
                     <input type="text" name="full_name" class="form-control"
                            placeholder="e.g. Admasu Dejene" required>
                 </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        Email Address <span style="color:var(--danger)">*</span>
+                        <span style="font-weight:400;color:var(--success);font-size:0.75rem;">
+                            — welcome email sent here
+                        </span>
+                    </label>
+                    <input type="email" name="email" class="form-control"
+                           placeholder="employee@gmail.com" required>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Username <span style="color:var(--danger)">*</span></label>
@@ -424,33 +490,48 @@ require_once $depth . 'includes/header.php';
                                placeholder="e.g. admasu.d" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <input type="email" name="email" class="form-control"
-                               placeholder="user@bit.edu.et">
+                        <label class="form-label">Role <span style="color:var(--danger)">*</span></label>
+                        <select name="role" class="form-control" required>
+                            <option value="">Select Role</option>
+                            <option value="admin">Administrator</option>
+                            <option value="hr">HR Personnel</option>
+                            <option value="finance">Finance Officer</option>
+                            <option value="employee">Employee</option>
+                        </select>
                     </div>
                 </div>
+
                 <div class="form-group">
-                    <label class="form-label">Password <span style="color:var(--danger)">*</span></label>
-                    <input type="password" name="password" class="form-control"
-                           placeholder="Min. 6 characters" required>
-                    <span class="form-hint">Will be stored as a secure bcrypt hash.</span>
+                    <label class="form-label">
+                        Password <span style="color:var(--danger)">*</span>
+                        <span style="font-weight:400;color:var(--info);font-size:0.75rem;">
+                            — sent in welcome email
+                        </span>
+                    </label>
+                    <div style="position:relative;">
+                        <input type="text" name="password" id="newUserPass"
+                               class="form-control"
+                               placeholder="Min. 6 characters" required
+                               style="padding-right:110px;">
+                        <button type="button" onclick="generatePassword()"
+                                style="position:absolute;right:6px;top:50%;transform:translateY(-50%);
+                                       background:var(--primary);color:white;border:none;
+                                       border-radius:5px;padding:4px 10px;font-size:0.75rem;
+                                       cursor:pointer;font-weight:600;">
+                            Generate
+                        </button>
+                    </div>
+                    <span class="form-hint">
+                        The employee will receive this password by email and should change it after first login.
+                    </span>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Role <span style="color:var(--danger)">*</span></label>
-                    <select name="role" class="form-control" required>
-                        <option value="">Select Role</option>
-                        <option value="admin">Administrator</option>
-                        <option value="hr">HR Personnel</option>
-                        <option value="finance">Finance Officer</option>
-                        <option value="employee">Employee</option>
-                    </select>
-                </div>
+
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary"
                         onclick="closeModal('addUserModal')">Cancel</button>
                 <button type="submit" name="create_user" class="btn btn-primary">
-                    <i class="fas fa-save"></i> Create User
+                    <i class="fas fa-user-plus"></i> Create &amp; Send Welcome Email
                 </button>
             </div>
         </form>
@@ -585,3 +666,17 @@ require_once $depth . 'includes/header.php';
 <?php endif; ?>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
+<script>
+function generatePassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!';
+    let pass = '';
+    for (let i = 0; i < 10; i++) {
+        pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const input = document.getElementById('newUserPass');
+    if (input) {
+        input.value = pass;
+        input.type  = 'text'; // show it
+    }
+}
+</script>
