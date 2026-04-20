@@ -5,6 +5,7 @@ $page_title = 'Process Payroll';
 $active_nav = 'process';
 $depth      = '../../';
 require_once $depth . 'database/db_connect.php';
+require_once $depth . 'includes/notify.php';
 
 $pdo     = getDB();
 $success = '';
@@ -362,6 +363,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payroll'])) {
             $success = 'Payroll for <strong>' . htmlspecialchars($period_label) . '</strong> confirmed and saved. '
                      . '<a href="verify_payroll.php?period_id=' . $period_id . '" class="btn btn-success btn-sm" style="margin-left:10px;">'
                      . '<i class="fas fa-check-double"></i> Go to Verify Payroll</a>';
+
+            // Notify admin
+            notify_role($pdo, 'admin',
+                'Payroll Processed — ' . $period_label,
+                'Finance has processed payroll for ' . count($active_employees) . ' employees. Awaiting verification.',
+                'info');
+
+            // Notify HR
+            notify_role($pdo, 'hr',
+                'Payroll Processed — ' . $period_label,
+                'Finance has processed payroll for ' . $period_label . '. Payslips will be available after verification.',
+                'info');
 
         } catch (PDOException $e) {
             $pdo->rollBack();

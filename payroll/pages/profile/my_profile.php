@@ -82,18 +82,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_photo'])) {
                     ->execute([$filename, $user_id]);
                 $_SESSION['profile_photo'] = $filename;
                 $user['profile_photo']     = $filename;
-                $success = 'Profile photo updated successfully! File: ' . $filename;
+                $success = 'Profile photo updated successfully.';
 
-                // Notification
-                $pdo->prepare("
-                    INSERT INTO notifications (user_id, title, message, type, link)
-                    VALUES (?, 'Profile Photo Updated', 'Your profile photo has been updated.', 'success', '/pages/profile/my_profile.php')
-                ")->execute([$user_id]);
+                // Notification — silently skip if table doesn't exist
+                try {
+                    $pdo->prepare("
+                        INSERT INTO notifications (user_id, title, message, type)
+                        VALUES (?, 'Profile Photo Updated', 'Your profile photo has been updated.', 'success')
+                    ")->execute([$user_id]);
+                } catch (Exception $e) { /* ignore */ }
+
             } else {
                 $error = 'Failed to save photo. '
-                       . 'Upload path: ' . $upload_path . ' | '
-                       . 'Folder exists: ' . (is_dir($uploads_fs) ? 'YES' : 'NO') . ' | '
-                       . 'Folder writable: ' . (is_writable($uploads_fs) ? 'YES' : 'NO');
+                       . 'Path: ' . $upload_path . ' | '
+                       . 'Folder: ' . (is_dir($uploads_fs) ? 'OK' : 'MISSING') . ' | '
+                       . 'Writable: ' . (is_writable($uploads_fs) ? 'YES' : 'NO');
             }
         }
     }
@@ -206,37 +209,63 @@ require_once $depth . 'includes/header.php';
     <div class="card-body">
         <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
 
-            <!-- Avatar / Photo -->
-            <div style="position:relative;flex-shrink:0;">
-                <?php if ($photo_url): ?>
-                <img src="<?= htmlspecialchars($photo_url) ?>"
-                     alt="Profile Photo"
-                     style="width:90px;height:90px;border-radius:50%;object-fit:cover;
-                            border:3px solid var(--primary);box-shadow:var(--shadow-md);">
-                <?php else: ?>
-                <div style="width:90px;height:90px;border-radius:50%;background:var(--primary);
-                            display:flex;align-items:center;justify-content:center;
-                            color:white;font-size:2.2rem;font-weight:700;
-                            border:3px solid var(--accent-light);box-shadow:var(--shadow-md);">
-                    <?= $initials ?>
-                </div>
-                <?php endif; ?>
+            <!-- Avatar / Photo with upload -->
+            <div style="flex-shrink:0;text-align:center;">
 
-                <!-- Upload trigger -->
-                <label for="photoInput"
-                       style="position:absolute;bottom:0;right:0;width:28px;height:28px;
-                              background:var(--primary);border-radius:50%;cursor:pointer;
-                              display:flex;align-items:center;justify-content:center;
-                              box-shadow:var(--shadow-sm);border:2px solid white;"
-                       title="Change photo">
-                    <i class="fas fa-camera" style="color:white;font-size:0.75rem;"></i>
-                </label>
+                <!-- Photo display -->
+                <div style="position:relative;display:inline-block;cursor:pointer;"
+                     onclick="document.getElementById('photoInput').click()"
+                     title="Click to change photo">
+
+                    <!-- Current photo or initials -->
+                    <img id="photoPreview"
+                         src="<?= $photo_url ? htmlspecialchars($photo_url) : '' ?>"
+                         alt="Profile Photo"
+                         style="width:100px;height:100px;border-radius:50%;object-fit:cover;
+                                border:3px solid var(--primary);box-shadow:var(--shadow-md);
+                                display:<?= $photo_url ? 'block' : 'none' ?>;">
+
+                    <div id="photoInitials"
+                         style="width:100px;height:100px;border-radius:50%;background:var(--primary);
+                                display:<?= $photo_url ? 'none' : 'flex' ?>;
+                                align-items:center;justify-content:center;
+                                color:white;font-size:2.5rem;font-weight:700;
+                                border:3px solid var(--accent-light);box-shadow:var(--shadow-md);">
+                        <?= $initials ?>
+                    </div>
+
+                    <!-- Camera overlay on hover -->
+                    <div style="position:absolute;inset:0;border-radius:50%;
+                                background:rgba(0,0,0,0.45);
+                                display:flex;flex-direction:column;align-items:center;
+                                justify-content:center;gap:4px;
+                                opacity:0;transition:opacity 0.2s;color:white;"
+                         onmouseover="this.style.opacity='1'"
+                         onmouseout="this.style.opacity='0'">
+                        <i class="fas fa-camera" style="font-size:1.4rem;"></i>
+                        <span style="font-size:0.65rem;font-weight:600;">Change</span>
+                    </div>
+                </div>
+
+                <!-- Upload hint -->
+                <p style="font-size:0.72rem;color:var(--gray-400);margin:8px 0 0;text-align:center;">
+                    Click photo to change
+                </p>
+
+                <!-- Hidden upload form -->
+                <form method="POST" enctype="multipart/form-data" id="photoForm">
+                    <input type="hidden" name="upload_photo" value="1">
+                    <input type="file" id="photoInput" name="profile_photo"
+                           accept="image/*"
+                           style="display:none;"
+                           onchange="previewAndUpload(this)">
+                </form>
             </div>
 
-            <!-- Info -->
+            <!-- User Info -->
             <div style="flex:1;min-width:0;">
                 <h2 style="margin:0 0 4px;"><?= htmlspecialchars($user['full_name']) ?></h2>
-                <p style="color:var(--gray-600);margin:0 0 6px;">
+                <p style="color:var(--gray-600);margin:0 0 8px;">
                     <?= htmlspecialchars($user['username']) ?>
                     &nbsp;·&nbsp;
                     <span class="badge badge-primary"><?= ucfirst($user['role']) ?></span>
@@ -246,21 +275,24 @@ require_once $depth . 'includes/header.php';
                     <?php endif; ?>
                 </p>
                 <?php if ($user['dept_name']): ?>
-                <p style="color:var(--gray-400);font-size:0.85rem;margin:0;">
+                <p style="color:var(--gray-400);font-size:0.85rem;margin:0 0 12px;">
                     <i class="fas fa-building"></i>
                     <?= htmlspecialchars($user['position'] ?? '') ?>
                     — <?= htmlspecialchars($user['dept_name']) ?>
                 </p>
                 <?php endif; ?>
+
+                <!-- Upload button (alternative to clicking photo) -->
+                <button type="button"
+                        onclick="document.getElementById('photoInput').click()"
+                        class="btn btn-secondary btn-sm">
+                    <i class="fas fa-camera"></i> Change Profile Photo
+                </button>
+                <p style="font-size:0.75rem;color:var(--gray-400);margin:6px 0 0;">
+                    JPG, PNG, GIF or WEBP — max 2MB — from any folder on your computer
+                </p>
             </div>
 
-            <!-- Photo upload form — triggered by camera icon click -->
-            <form method="POST" enctype="multipart/form-data" id="photoForm" style="display:none;">
-                <input type="hidden" name="upload_photo" value="1">
-                <input type="file" id="photoInput" name="profile_photo"
-                       accept="image/jpeg,image/png,image/gif,image/webp"
-                       onchange="document.getElementById('photoForm').submit();">
-            </form>
         </div>
     </div>
 </div>
@@ -477,30 +509,32 @@ function checkStrength(val) {
     text.style.color    = lvl.color;
 }
 
-// Preview photo before upload
-document.getElementById('photoInput').addEventListener('change', function() {
-    if (this.files && this.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            // Update profile page avatar immediately
-            const img = document.querySelector('img[alt="Profile Photo"]');
-            if (img) {
-                img.src = e.target.result;
-            } else {
-                // Replace the initial div with an img
-                const div = document.querySelector('[style*="border-radius:50%"][style*="background:var(--primary)"]');
-                if (div && div.parentElement) {
-                    const newImg = document.createElement('img');
-                    newImg.src   = e.target.result;
-                    newImg.alt   = 'Profile Photo';
-                    newImg.style.cssText = 'width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);box-shadow:0 4px 16px rgba(21,101,192,0.14);';
-                    div.parentElement.replaceChild(newImg, div);
-                }
-            }
-        };
-        reader.readAsDataURL(this.files[0]);
-    }
-});
+// ── Profile photo: preview then auto-submit ────────────────
+function previewAndUpload(input) {
+    if (!input.files || !input.files[0]) return;
+
+    const file   = input.files[0];
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        // Show preview immediately
+        const preview  = document.getElementById('photoPreview');
+        const initials = document.getElementById('photoInitials');
+
+        if (preview) {
+            preview.src           = e.target.result;
+            preview.style.display = 'block';
+        }
+        if (initials) {
+            initials.style.display = 'none';
+        }
+
+        // Submit the form to upload
+        document.getElementById('photoForm').submit();
+    };
+
+    reader.readAsDataURL(file);
+}
 </script>
 
 <?php require_once $depth . 'includes/footer.php'; ?>

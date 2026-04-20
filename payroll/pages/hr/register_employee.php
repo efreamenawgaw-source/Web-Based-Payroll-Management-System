@@ -4,6 +4,7 @@ $page_title = 'Register Employee';
 $active_nav = 'register';
 $depth      = '../../';
 require_once $depth . 'database/db_connect.php';
+require_once $depth . 'includes/notify.php';
 
 $pdo     = getDB();
 $success = '';
@@ -107,7 +108,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
             $success = "Employee <strong>{$full_name}</strong> ({$emp_id}) registered successfully!";
-            $post    = []; // clear form
+
+            // Notify admin and finance
+            notify_role($pdo, 'admin',
+                'New Employee Registered',
+                "HR registered new employee: {$full_name} ({$emp_id})",
+                'success');
+            notify_role($pdo, 'finance',
+                'New Employee Added',
+                "{$full_name} ({$emp_id}) has been registered. Update allowances and deductions before payroll.",
+                'info');
+
+            $post = [];
 
         } catch (PDOException $e) {
             $pdo->rollBack();

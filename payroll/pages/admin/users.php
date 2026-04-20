@@ -4,6 +4,7 @@ $page_title = 'Manage Users';
 $active_nav = 'users';
 $depth      = '../../';
 require_once $depth . 'database/db_connect.php';
+require_once $depth . 'includes/notify.php';
 
 $pdo     = getDB();
 $success = '';
@@ -53,6 +54,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
             ]);
 
             $success = "User <strong>{$full_name}</strong> ({$username}) created successfully.";
+
+            // Notify the new user
+            notify($pdo, (int)$new_id,
+                'Welcome to BiT Payroll System',
+                "Your account has been created. Username: {$username} | Role: " . ucfirst($role) . ". Login to get started.",
+                'success');
+
+            // Notify admin (other admins)
+            notify_role($pdo, 'admin',
+                'New User Created',
+                "Admin created new user: {$full_name} ({$username}) with role: " . ucfirst($role),
+                'info');
         } catch (PDOException $e) {
             $error = 'Create failed: ' . $e->getMessage();
         }

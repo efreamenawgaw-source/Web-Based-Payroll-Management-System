@@ -4,6 +4,7 @@ $page_title = 'Generate Payslips';
 $active_nav = 'payslip';
 $depth      = '../../';
 require_once $depth . 'database/db_connect.php';
+require_once $depth . 'includes/notify.php';
 
 $pdo     = getDB();
 $success = '';
@@ -97,6 +98,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
 
             $pdo->commit();
             $success = "<strong>{$generated} payslips</strong> generated successfully. Employees can now view and download their payslips.";
+
+            // Get period label
+            $pl = $pdo->prepare("SELECT period_label FROM payroll_periods WHERE period_id=?");
+            $pl->execute([$pid]);
+            $plabel = $pl->fetch()['period_label'] ?? "Period #{$pid}";
+
+            // Notify each employee individually
+            $emp_users = $pdo->prepare("
+                SELECT e.user_id, e.full_name, pr.net_pay
+                FROM   payroll_records pr
+                JOIN   employees e ON pr.emp_id = e.emp_id
+                WHERE  pr.period_id = ? AND e.user_id IS NOT NULL
+            ");
+            $emp_users->execute([$pid]);
+            foreach ($emp_users->fetchAll() as $eu) {
+                notify($pdo, $eu['user_id'],
+                    'Payslip Available — ' . $plabel,
+                    "Your payslip for {$plabel} is ready. Net Pay: ETB " . number_format($eu['net_pay'], 2) . ". Click to view and download.",
+                    'success',
+                    '/pages/employee/payslips.php');
+            }
+
+            // Notify admin and HR
+            notify_role($pdo, 'admin',
+                'Payslips Generated — ' . $plabel,
+                "{$generated} payslips generated for {$plabel}. Employees have been notified.",
+                'success');
+            notify_role($pdo, 'hr',
+                'Payslips Generated — ' . $plabel,
+                "{$generated} payslips are now available for employees for {$plabel}.",
+                'success');
 
             // Reload records
             $rec_stmt->execute([$pid]);

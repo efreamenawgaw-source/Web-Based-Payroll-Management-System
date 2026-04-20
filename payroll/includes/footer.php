@@ -132,14 +132,14 @@ function loadNotifications() {
             };
 
             list.innerHTML = data.notifications.map(n => `
-                <div onclick="markRead(${n.notif_id}, this)"
+                <div onclick="openNotif(${n.notif_id}, '${n.link || ''}')"
                      style="padding:12px 16px;border-bottom:1px solid var(--gray-200);
                             cursor:pointer;display:flex;gap:12px;align-items:flex-start;
                             background:${n.is_read == 1 ? 'var(--white)' : 'var(--bg-light)'};
                             transition:background 0.2s;"
                      onmouseover="this.style.background='var(--bg-light)'"
                      onmouseout="this.style.background='${n.is_read == 1 ? 'var(--white)' : 'var(--bg-light)'}'">
-                    <div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;
                                 background:${typeColors[n.type] || 'var(--info)'}20;
                                 display:flex;align-items:center;justify-content:center;">
                         <i class="fas ${typeIcons[n.type] || 'fa-info-circle'}"
@@ -156,7 +156,7 @@ function loadNotifications() {
                         </p>
                         <p style="font-size:0.7rem;color:var(--gray-400);margin:0;">${n.time_ago}</p>
                     </div>
-                    ${n.is_read == 0 ? '<div style="width:8px;height:8px;border-radius:50%;background:var(--primary);flex-shrink:0;margin-top:4px;"></div>' : ''}
+                    ${n.is_read == 0 ? '<div style="width:8px;height:8px;border-radius:50%;background:var(--primary);flex-shrink:0;margin-top:6px;"></div>' : ''}
                 </div>
             `).join('');
         })
@@ -169,6 +169,22 @@ function markRead(id, el) {
     fd.append('notif_id', id);
     fetch(NOTIF_API, { method: 'POST', body: fd })
         .then(() => loadNotifications());
+}
+
+function openNotif(id, link) {
+    // Mark as read
+    const fd = new FormData();
+    fd.append('action', 'mark_read');
+    fd.append('notif_id', id);
+    fetch(NOTIF_API, { method: 'POST', body: fd }).then(() => {
+        loadNotifications();
+        // Navigate if link provided
+        if (link && link.trim() !== '') {
+            // Build full URL from the link path
+            const base = window.location.pathname.split('/pages/')[0];
+            window.location.href = base + link;
+        }
+    });
 }
 
 function markAllRead() {

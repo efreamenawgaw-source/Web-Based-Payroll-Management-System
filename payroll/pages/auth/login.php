@@ -8,6 +8,7 @@ if (isset($_SESSION['user_id'])) {
 }
 
 require_once '../../database/db_connect.php';
+require_once '../../includes/notify.php';
 
 $error   = '';
 $MAX_ATTEMPTS = 5;          // lock after 5 failures
@@ -73,12 +74,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     VALUES (?, ?, ?, 'Login', 'Failed login attempt', ?, 'failed')
                 ")->execute([$user['user_id'], $user['username'], $user['role'], $ip]);
             } else {
-                // Unknown username
+                // Unknown username — notify admins of suspicious attempt
                 $pdo->prepare("
                     INSERT INTO audit_logs
                         (username, action, details, ip_address, status)
                     VALUES (?, 'Login', 'Unknown username attempt', ?, 'failed')
                 ")->execute([$username, $ip]);
+
+                // Alert admins of repeated unknown login attempts
+                try {
+                    $fail_count = $pdo->prepare("
+                        SELECT COUNT(*) FROM audit_logs
+                        WHERE status='failed' AND action='Login'
+                        AND ip_address=? AND logged_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+                    ");
+                    $fail_count->execute([$ip]);
+                    if ((int)$fail_count->fetchColumn() >= 3) {
+                        notify_role($pdo, 'admin',
+                            '⚠️ Multiple Failed Login Attempts',
+                            "IP {$ip} has failed to login 3+ times in the last 10 minutes. Username tried: {$username}",
+                            'danger');
+                    }
+                } catch (Exception $e) { /* ignore */ }
             }
 
             if ($user && !$user['is_active']) {

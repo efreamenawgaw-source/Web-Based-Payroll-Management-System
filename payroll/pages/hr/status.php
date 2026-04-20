@@ -4,6 +4,7 @@ $page_title = 'Employee Status';
 $active_nav = 'status';
 $depth      = '../../';
 require_once $depth . 'database/db_connect.php';
+require_once $depth . 'includes/notify.php';
 
 $pdo     = getDB();
 $success = '';
@@ -67,6 +68,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
             $pdo->commit();
             $success = "Status of <strong>{$prev_row['full_name']}</strong> updated to
                         <strong>" . ucfirst(str_replace('_',' ',$new_status)) . "</strong>.";
+
+            // Notify admin
+            notify_role($pdo, 'admin',
+                'Employee Status Changed',
+                "{$prev_row['full_name']} ({$emp_id}): {$prev_row['status']} → {$new_status}",
+                'info');
+
+            // Notify finance if terminated (exclude from payroll)
+            if ($new_status === 'terminated') {
+                notify_role($pdo, 'finance',
+                    'Employee Terminated',
+                    "{$prev_row['full_name']} ({$emp_id}) has been terminated and will be excluded from future payroll.",
+                    'warning');
+            }
+
+            // Notify the employee themselves if they have a user account
+            $emp_user = $pdo->prepare("SELECT user_id FROM employees WHERE emp_id = ?");
+            $emp_user->execute([$emp_id]);
+            $eu = $emp_user->fetch();
+            if ($eu) {
+                $status_label = ucfirst(str_replace('_', ' ', $new_status));
+                notify($pdo, $eu['user_id'],
+                    'Employment Status Updated',
+                    "Your employment status has been updated to: {$status_label}." .
+                    ($reason ? " Reason: {$reason}" : ''),
+                    $new_status === 'active' ? 'success' : 'warning');
+            }
+
             $selected_emp_id = $emp_id;
 
         } catch (PDOException $e) {

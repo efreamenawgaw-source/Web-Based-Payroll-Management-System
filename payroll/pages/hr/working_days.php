@@ -4,6 +4,7 @@ $page_title = 'Working Days';
 $active_nav = 'working_days';
 $depth      = '../../';
 require_once $depth . 'database/db_connect.php';
+require_once $depth . 'includes/notify.php';
 
 $pdo     = getDB();
 $success = '';
@@ -79,6 +80,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_working_days']))
             $f_month = $eff_month;
             $f_year  = $eff_year;
             $success = "Working days saved for <strong>{$saved} employees</strong> — {$period_label}. Finance can now process payroll.";
+
+            // Notify all Finance users that working days are ready
+            notify_role($pdo, 'finance',
+                'Working Days Submitted — ' . $period_label,
+                "HR has submitted working days for {$saved} employees for {$period_label}. You can now process payroll.",
+                'success',
+                '/pages/finance/process_payroll.php');
+
+            // Notify admin
+            notify_role($pdo, 'admin',
+                'Working Days Submitted',
+                "HR submitted working days for {$saved} employees — {$period_label}.",
+                'info');
 
         } catch (PDOException $e) {
             $pdo->rollBack();

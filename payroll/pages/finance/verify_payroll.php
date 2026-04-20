@@ -4,6 +4,7 @@ $page_title = 'Verify Payroll';
 $active_nav = 'verify';
 $depth      = '../../';
 require_once $depth . 'database/db_connect.php';
+require_once $depth . 'includes/notify.php';
 
 $pdo     = getDB();
 $success = '';
@@ -73,6 +74,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
             $success = 'Payroll verified and approved. '
                      . '<a href="generate_payslip.php?period_id=' . $pid . '" class="btn btn-primary btn-sm" style="margin-left:10px;">'
                      . '<i class="fas fa-file-invoice-dollar"></i> Generate Payslips</a>';
+
+            // Get period label
+            $pl = $pdo->prepare("SELECT period_label FROM payroll_periods WHERE period_id=?");
+            $pl->execute([$pid]);
+            $pl_row = $pl->fetch();
+            $plabel = $pl_row['period_label'] ?? "Period #{$pid}";
+
+            // Notify admin
+            notify_role($pdo, 'admin',
+                'Payroll Verified — ' . $plabel,
+                "Finance has verified and approved payroll for {$plabel}. Payslips can now be generated.",
+                'success');
+
+            // Notify HR
+            notify_role($pdo, 'hr',
+                'Payroll Verified — ' . $plabel,
+                "Payroll for {$plabel} has been verified. Payslips will be generated shortly.",
+                'success');
 
             // Reload
             $sp->execute([$pid]);

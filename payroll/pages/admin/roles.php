@@ -4,6 +4,7 @@ $page_title = 'Assign Roles';
 $active_nav = 'roles';
 $depth      = '../../';
 require_once $depth . 'database/db_connect.php';
+require_once $depth . 'includes/notify.php';
 
 $pdo     = getDB();
 $success = '';
@@ -50,6 +51,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_role'])) {
                 $success = "Role of <strong>{$cur_user['full_name']}</strong> changed from
                             <strong>" . ucfirst($cur_user['role']) . "</strong> to
                             <strong>" . ucfirst($new_role) . "</strong>.";
+
+                // Notify the user whose role changed
+                notify($pdo, $uid,
+                    'Your Role Has Been Updated',
+                    "Your system role has been changed from " . ucfirst($cur_user['role']) . " to " . ucfirst($new_role) . ". Please logout and login again to apply changes.",
+                    'warning');
+
+                // Notify all admins
+                notify_role($pdo, 'admin',
+                    'Role Assignment',
+                    "Admin changed {$cur_user['full_name']}'s role: " . ucfirst($cur_user['role']) . " → " . ucfirst($new_role),
+                    'info');
                 $selected_uid = $uid;
             } catch (PDOException $e) {
                 $error = 'Role update failed: ' . $e->getMessage();
