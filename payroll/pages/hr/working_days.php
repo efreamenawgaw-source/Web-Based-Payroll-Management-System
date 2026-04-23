@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 $page_title = 'Working Days';
 $active_nav = 'working_days';
@@ -439,7 +439,7 @@ require_once $depth . 'includes/header.php';
                         </td>
                         <td class="text-bold"><?= number_format($expense, 2) ?></td>
                         <td style="color:<?= $diff < 0 ? 'var(--danger)' : 'var(--gray-400)' ?>;font-size:0.85rem;">
-                            <?= $diff < 0 ? '− ETB ' . number_format(abs($diff), 2) : '—' ?>
+                            <?= $diff < 0 ? '- ETB ' . number_format(abs($diff), 2) : '—' ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -452,7 +452,7 @@ require_once $depth . 'includes/header.php';
                         <td style="padding:12px 16px;color:var(--success);"><?= number_format($total_expense, 2) ?></td>
                         <td style="padding:12px 16px;color:var(--danger);">
                             <?php $total_diff = $total_expense - $total_basic;
-                            echo $total_diff < 0 ? '− ETB ' . number_format(abs($total_diff), 2) : '—'; ?>
+                            echo $total_diff < 0 ? '- ETB ' . number_format(abs($total_diff), 2) : '—'; ?>
                         </td>
                     </tr>
                 </tfoot>

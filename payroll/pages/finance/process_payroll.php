@@ -194,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_payroll'])) {
                 // Total deductions = Income Tax + Pension Employee + Other Deductions
                 $total_deductions = round($income_tax + $pension_emp + $other_deductions, 2);
 
-                // Net Pay = Gross − Total Deductions
+                // Net Pay = Gross - Total Deductions
                 $net_pay = round($gross - $total_deductions, 2);
 
                 $results[] = [
@@ -556,11 +556,11 @@ require_once $depth . 'includes/header.php';
                     <?php
                     $brackets = [
                         [1,'0 — 2,000',       '0% (Exempt)','0',       'Tax = 0',                         'badge-success'],
-                        [2,'2,001 — 4,000',   '15%',        '300',     'Tax = (Gross × 0.15) − 300',      'badge-info'],
-                        [3,'4,001 — 7,000',   '20%',        '500',     'Tax = (Gross × 0.20) − 500',      'badge-primary'],
-                        [4,'7,001 — 10,000',  '25%',        '850',     'Tax = (Gross × 0.25) − 850',      'badge-warning'],
-                        [5,'10,001 — 14,000', '30%',        '1,350',   'Tax = (Gross × 0.30) − 1,350',    'badge-warning'],
-                        [6,'Over 14,000',     '35%',        '2,050',   'Tax = (Gross × 0.35) − 2,050',    'badge-danger'],
+                        [2,'2,001 — 4,000',   '15%',        '300',     'Tax = (Gross × 0.15) - 300',      'badge-info'],
+                        [3,'4,001 — 7,000',   '20%',        '500',     'Tax = (Gross × 0.20) - 500',      'badge-primary'],
+                        [4,'7,001 — 10,000',  '25%',        '850',     'Tax = (Gross × 0.25) - 850',      'badge-warning'],
+                        [5,'10,001 — 14,000', '30%',        '1,350',   'Tax = (Gross × 0.30) - 1,350',    'badge-warning'],
+                        [6,'Over 14,000',     '35%',        '2,050',   'Tax = (Gross × 0.35) - 2,050',    'badge-danger'],
                     ];
                     foreach ($brackets as $b): ?>
                     <tr>
@@ -763,7 +763,7 @@ require_once $depth . 'includes/header.php';
             <span>
                 Income tax per <strong>Revised Monthly Employment Tax Brackets — Ethiopia 2025</strong>.
                 Pension: Employee <strong>11%</strong> + Employer <strong>18%</strong> of basic salary.
-                Net Pay = Gross − Income Tax − Pension (18%) − Other Deductions.
+                Net Pay = Gross - Income Tax - Pension (18%) - Other Deductions.
             </span>
         </div>
     </div>

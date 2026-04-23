@@ -869,6 +869,38 @@ tbody tr:last-child { border-bottom: none; }
 .back-to-top:hover   { background: var(--primary-dark); transform: translateY(-3px); }
 
 /* ============================================================
+   PROFILE HEADER
+   ============================================================ */
+.profile-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: nowrap;
+}
+.profile-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.profile-info {
+    flex: 1;
+    min-width: 0;
+}
+.profile-contact {
+    text-align: right;
+    flex-shrink: 0;
+    max-width: 220px;
+}
+
+/* ============================================================
    RESPONSIVE — TABLET  (max-width: 1024px)
    ============================================================ */
 @media (max-width: 1024px) {
@@ -981,6 +1013,19 @@ tbody tr:last-child { border-bottom: none; }
 
     /* --- Pagination centers --- */
     .pagination { justify-content: center; }
+
+    /* --- Profile header stacks on mobile --- */
+    .profile-header-inner {
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    .profile-contact {
+        text-align: left;
+        max-width: 100%;
+        width: 100%;
+        padding-top: 8px;
+        border-top: 1px solid var(--gray-200);
+    }
 
     /* --- Typography --- */
     h1 { font-size: 1.4rem; }

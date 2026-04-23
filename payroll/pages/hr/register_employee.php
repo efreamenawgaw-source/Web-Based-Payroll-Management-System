@@ -185,7 +185,7 @@ require_once $depth . 'includes/header.php';
                            placeholder="e.g. EMP-101"
                            value="<?= htmlspecialchars($post['emp_id'] ?? '') ?>"
                            style="text-transform:uppercase" required>
-                    <span class="form-hint">Must be unique &rdquo;” e.g. EMP-101</span>
+                    <span class="form-hint">Must be unique &mdash; e.g. EMP-101</span>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Gender <span style="color:var(--danger)">*</span></label>
@@ -301,7 +301,7 @@ require_once $depth . 'includes/header.php';
         <h3><i class="fas fa-hand-holding-usd" style="color:var(--success);margin-right:8px"></i>
             Initial Allowances (ETB)
         </h3>
-        <span class="text-muted" style="font-size:0.8rem;">Optional &rdquo;” can be updated later</span>
+        <span class="text-muted" style="font-size:0.8rem;">Optional &mdash; can be updated later</span>
     </div>
     <div class="card-body">
         <div class="form-row">

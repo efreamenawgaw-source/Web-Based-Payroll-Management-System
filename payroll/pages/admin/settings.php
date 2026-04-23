@@ -83,7 +83,7 @@ require_once $depth . 'includes/header.php';
             <div class="form-group">
                 <label class="form-label">Currency</label>
                 <select name="currency" class="form-control">
-                    <option value="ETB" selected>ETB &rdquo;” Ethiopian Birr</option>
+                    <option value="ETB" selected>ETB &mdash; Ethiopian Birr</option>
                 </select>
             </div>
             <div class="form-group">
@@ -100,7 +100,7 @@ require_once $depth . 'includes/header.php';
 <div class="card mt-3">
     <div class="card-header">
         <h3><i class="fas fa-percent" style="color:var(--warning);margin-right:8px"></i>Revised Monthly Employment Income Tax Brackets (2025)</h3>
-        <span class="badge badge-warning">Read Only &rdquo;” Set by Law</span>
+        <span class="badge badge-warning">Read Only &mdash; Set by Law</span>
     </div>
     <div class="card-body" style="padding:0">
         <div class="table-wrapper">
@@ -118,12 +118,12 @@ require_once $depth . 'includes/header.php';
                     <?php
                     // Revised 2025 brackets
                     $brackets = [
-                        [1, '0 &rdquo;” 2,000',       '0% (Exempt)', '0',       'Tax = 0'],
-                        [2, '2,001 &rdquo;” 4,000',   '15%',         '300',     'Tax = (Income Ã— 0.15) âˆ’ 300'],
-                        [3, '4,001 &rdquo;” 7,000',   '20%',         '500',     'Tax = (Income Ã— 0.20) âˆ’ 500'],
-                        [4, '7,001 &rdquo;” 10,000',  '25%',         '850',     'Tax = (Income Ã— 0.25) âˆ’ 850'],
-                        [5, '10,001 &rdquo;” 14,000', '30%',         '1,350',   'Tax = (Income Ã— 0.30) âˆ’ 1,350'],
-                        [6, 'Over 14,000',     '35%',         '2,050',   'Tax = (Income Ã— 0.35) âˆ’ 2,050'],
+                        [1, '0 &mdash; 2,000',       '0% (Exempt)', '0',       'Tax = 0'],
+                        [2, '2,001 &mdash; 4,000',   '15%',         '300',     'Tax = (Income &times; 0.15) - 300'],
+                        [3, '4,001 &mdash; 7,000',   '20%',         '500',     'Tax = (Income &times; 0.20) - 500'],
+                        [4, '7,001 &mdash; 10,000',  '25%',         '850',     'Tax = (Income &times; 0.25) - 850'],
+                        [5, '10,001 &mdash; 14,000', '30%',         '1,350',   'Tax = (Income &times; 0.30) - 1,350'],
+                        [6, 'Over 14,000',     '35%',         '2,050',   'Tax = (Income &times; 0.35) - 2,050'],
                     ];
                     $badge_colors = [1=>'badge-success',2=>'badge-info',3=>'badge-primary',4=>'badge-warning',5=>'badge-warning',6=>'badge-danger'];
                     foreach ($brackets as $b): ?>
@@ -140,7 +140,7 @@ require_once $depth . 'includes/header.php';
         </div>
         <div style="padding:10px 16px;background:var(--success-light);border-top:1px solid var(--gray-200);font-size:0.8rem;color:var(--success);">
             <i class="fas fa-arrow-up"></i>
-            <strong>2025 Update:</strong> Exempt threshold raised from ETB 600 â†’ <strong>ETB 2,000/month</strong>.
+            <strong>2025 Update:</strong> Exempt threshold raised from ETB 600 &rarr; <strong>ETB 2,000/month</strong>.
             The 10% bracket has been removed. Minimum taxable rate is now 15%.
         </div>
     </div>

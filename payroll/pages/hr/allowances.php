@@ -151,7 +151,7 @@ require_once $depth . 'includes/header.php';
                         <?php foreach ($employees as $e): ?>
                         <option value="<?= htmlspecialchars($e['emp_id']) ?>"
                             <?= $selected_emp_id === $e['emp_id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($e['emp_id']) ?> &rdquo;” <?= htmlspecialchars($e['full_name']) ?>
+                            <?= htmlspecialchars($e['emp_id']) ?> &mdash; <?= htmlspecialchars($e['full_name']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -165,7 +165,7 @@ require_once $depth . 'includes/header.php';
                             <p style="font-size:0.72rem;color:var(--gray-400);margin:0;text-transform:uppercase;">Employee</p>
                             <p style="font-weight:700;margin:0;"><?= htmlspecialchars($sel_emp['full_name']) ?></p>
                             <p style="font-size:0.8rem;color:var(--gray-600);margin:0;">
-                                <?= htmlspecialchars($sel_emp['position']) ?> &rdquo;” <?= htmlspecialchars($sel_emp['dept_name']) ?>
+                                <?= htmlspecialchars($sel_emp['position']) ?> &mdash; <?= htmlspecialchars($sel_emp['dept_name']) ?>
                             </p>
                         </div>
                         <div style="text-align:right;">
@@ -296,7 +296,7 @@ require_once $depth . 'includes/header.php';
             <div class="alert alert-info" style="margin:0;font-size:0.82rem;">
                 <i class="fas fa-info-circle"></i>
                 Pension (18%) is on <strong>basic salary only</strong>.
-                Tax is on <strong>Gross âˆ’ Pension</strong>.
+                Tax is on <strong>Gross - Pension</strong>.
             </div>
         </div>
     </div>

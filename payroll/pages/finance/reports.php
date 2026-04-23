@@ -159,7 +159,7 @@ if ($f_period_id) {
             <div class="filter-bar">
                 <div class="form-group" style="margin:0;flex:1;">
                     <select name="period_id" class="form-control" onchange="this.form.submit()">
-                        <option value="">&rdquo;” Select Period &rdquo;”</option>
+                        <option value="">&mdash; Select Period &mdash;</option>
                         <?php foreach ($all_periods as $p): ?>
                         <option value="<?= $p['period_id'] ?>"
                             <?= $f_period_id === (int)$p['period_id'] ? 'selected' : '' ?>>
@@ -221,7 +221,7 @@ if ($f_period_id) {
     <div class="card-header">
         <h3>
             <i class="fas fa-table" style="color:var(--primary);margin-right:8px"></i>
-            Payroll Report &rdquo;” <?= htmlspecialchars($sel_period['period_label']) ?>
+            Payroll Report &mdash; <?= htmlspecialchars($sel_period['period_label']) ?>
             <?= $f_dept ? '(' . htmlspecialchars(array_column($departments,'dept_name','dept_id')[$f_dept] ?? '') . ')' : '' ?>
         </h3>
         <div class="d-flex gap-2">
@@ -268,11 +268,11 @@ if ($f_period_id) {
                                 <?= $r['working_days'] ?>
                             </span>
                         </td>
-                        <td><?= $r['total_allowances'] > 0 ? number_format($r['total_allowances'], 2) : '&rdquo;”' ?></td>
+                        <td><?= $r['total_allowances'] > 0 ? number_format($r['total_allowances'], 2) : '&mdash;' ?></td>
                         <td class="text-bold" style="color:var(--success);"><?= number_format($r['gross_salary'], 2) ?></td>
                         <td style="color:var(--danger);"><?= number_format($r['income_tax'], 2) ?></td>
                         <td style="color:var(--warning);"><?= number_format($r['pension_employee'], 2) ?></td>
-                        <td style="color:var(--info);"><?= $r['other_deductions'] > 0 ? number_format($r['other_deductions'], 2) : '&rdquo;”' ?></td>
+                        <td style="color:var(--info);"><?= $r['other_deductions'] > 0 ? number_format($r['other_deductions'], 2) : '&mdash;' ?></td>
                         <td style="color:var(--info);"><?= number_format($r['pension_employer'], 2) ?></td>
                         <td class="text-bold" style="color:var(--danger);"><?= number_format($r['total_deductions'], 2) ?></td>
                         <td class="text-bold" style="color:var(--success);font-size:1rem;"><?= number_format($r['net_pay'], 2) ?></td>
@@ -304,7 +304,7 @@ if ($f_period_id) {
 <div class="card mb-3">
     <div class="card-header">
         <h3><i class="fas fa-building" style="color:var(--primary);margin-right:8px"></i>
-            Department Breakdown &rdquo;” <?= htmlspecialchars($sel_period['period_label']) ?>
+            Department Breakdown &mdash; <?= htmlspecialchars($sel_period['period_label']) ?>
         </h3>
     </div>
     <div class="card-body">
@@ -340,7 +340,7 @@ if ($f_period_id) {
 <div class="card">
     <div class="card-header">
         <h3><i class="fas fa-chart-bar" style="color:var(--primary);margin-right:8px"></i>
-            Annual Summary &rdquo;” <?= date('Y') ?>
+            Annual Summary &mdash; <?= date('Y') ?>
         </h3>
         <span class="badge badge-primary"><?= count($annual) ?> months processed</span>
     </div>

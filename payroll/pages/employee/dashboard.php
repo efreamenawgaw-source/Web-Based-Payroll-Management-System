@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 session_start();
 $page_title = 'Employee Dashboard';
 $active_nav = 'dashboard';
@@ -8,7 +8,7 @@ require_once $depth . 'includes/header.php';
 
 $pdo = getDB();
 
-// â”€â”€ Get employee record linked to this user â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Get employee record linked to this user ────────────────
 $emp_stmt = $pdo->prepare("
     SELECT e.*,
            d.dept_name,
@@ -21,7 +21,7 @@ $emp_stmt = $pdo->prepare("
 $emp_stmt->execute([$_SESSION['user_id']]);
 $employee = $emp_stmt->fetch();
 
-// â”€â”€ If no employee record linked â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── If no employee record linked ───────────────────────────
 if (!$employee) {
     require_once $depth . 'includes/footer.php';
     exit();
@@ -29,7 +29,7 @@ if (!$employee) {
 
 $emp_id = $employee['emp_id'];
 
-// â”€â”€ Latest payslip (most recent period) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Latest payslip (most recent period) ───────────────────
 $latest_ps = $pdo->prepare("
     SELECT ps.payslip_id, ps.generated_at,
            pp.period_label, pp.period_month, pp.period_year,
@@ -52,7 +52,7 @@ $latest_ps = $pdo->prepare("
 $latest_ps->execute([$emp_id]);
 $latest = $latest_ps->fetch();
 
-// â”€â”€ Latest deductions breakdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Latest deductions breakdown ────────────────────────────
 $latest_ded = null;
 if ($latest) {
     $dv = $pdo->prepare("
@@ -75,7 +75,7 @@ if ($latest) {
     }
 }
 
-// â”€â”€ Recent payslips (last 5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Recent payslips (last 5) ───────────────────────────────
 $recent_ps = $pdo->prepare("
     SELECT ps.payslip_id,
            pp.period_label, pp.period_month, pp.period_year,
@@ -91,7 +91,7 @@ $recent_ps = $pdo->prepare("
 $recent_ps->execute([$emp_id]);
 $recent_payslips = $recent_ps->fetchAll();
 
-// â”€â”€ Annual totals (current year) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Annual totals (current year) ───────────────────────────
 $annual = $pdo->prepare("
     SELECT
         SUM(pr.gross_salary)     AS total_gross,
@@ -108,7 +108,7 @@ $annual = $pdo->prepare("
 $annual->execute([$emp_id, date('Y')]);
 $annual_data = $annual->fetch();
 
-// â”€â”€ Current allowances â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Current allowances ─────────────────────────────────────
 $allow_stmt = $pdo->prepare("
     SELECT * FROM allowances
     WHERE emp_id = ? AND effective_to IS NULL
@@ -143,7 +143,7 @@ $status_badge = [
 </div>
 <?php else: ?>
 
-<!-- â”€â”€ Stats â”€â”€ -->
+<!-- ── Stats ── -->
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-icon blue"><i class="fas fa-wallet"></i></div>
@@ -152,7 +152,7 @@ $status_badge = [
             <h2>
                 <?= $annual_data['total_gross']
                     ? 'ETB ' . number_format($annual_data['total_gross'], 0)
-                    : '&rdquo;”' ?>
+                    : '&mdash;' ?>
             </h2>
             <span class="stat-change up">
                 <?= $annual_data['months_paid'] ?? 0 ?> months paid
@@ -166,7 +166,7 @@ $status_badge = [
             <h2>
                 <?= $latest
                     ? 'ETB ' . number_format($latest['net_pay'], 0)
-                    : '&rdquo;”' ?>
+                    : '&mdash;' ?>
             </h2>
             <span class="stat-change up">
                 <?= $latest ? htmlspecialchars($latest['period_label']) : 'No payslip yet' ?>
@@ -191,7 +191,7 @@ $status_badge = [
                 <?php if ($latest):
                     $total_ded = $latest['income_tax'] + $latest['pension_employee'] + $latest['other_deductions'];
                     echo 'ETB ' . number_format($total_ded, 0);
-                else: ?>&rdquo;”<?php endif; ?>
+                else: ?>&mdash;<?php endif; ?>
             </h2>
             <span class="stat-change down">Tax + Pension + Other</span>
         </div>
@@ -200,12 +200,12 @@ $status_badge = [
 
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-    <!-- â”€â”€ Latest Payslip Breakdown â”€â”€ -->
+    <!-- ── Latest Payslip Breakdown ── -->
     <div class="card">
         <div class="card-header">
             <h3>
                 <i class="fas fa-file-invoice-dollar" style="color:var(--primary);margin-right:8px"></i>
-                <?= $latest ? htmlspecialchars($latest['period_label']) . ' &rdquo;” Breakdown' : 'No Payslip Yet' ?>
+                <?= $latest ? htmlspecialchars($latest['period_label']) . ' &mdash; Breakdown' : 'No Payslip Yet' ?>
             </h3>
             <?php if ($latest): ?>
             <span class="badge badge-success">Available</span>
@@ -226,19 +226,19 @@ $status_badge = [
             if ($latest['teaching'] > 0)
                 $rows[] = ['Teaching Allowance', number_format($latest['teaching'], 2), 'var(--gray-800)', false];
             $rows[] = ['Gross Earnings', number_format($latest['gross_salary'], 2), 'var(--primary)', true];
-            $rows[] = ['Income Tax (' . ($latest['tax_bracket'] ?? '') . ')', 'âˆ’ ' . number_format($latest['income_tax'], 2), 'var(--danger)', false];
-            $rows[] = ['Employee 11%)', 'âˆ’ ' . number_format($latest['pension_employee'], 2), 'var(--warning)', false];
+            $rows[] = ['Income Tax (' . ($latest['tax_bracket'] ?? '') . ')', '- ' . number_format($latest['income_tax'], 2), 'var(--danger)', false];
+            $rows[] = ['Employee Pension (11%)', '- ' . number_format($latest['pension_employee'], 2), 'var(--warning)', false];
 
             // Other deductions
             if ($latest_ded) {
                 if ((float)$latest_ded['credit_association'] > 0)
-                    $rows[] = ['Credit Association (10%)', 'âˆ’ ' . number_format($latest_ded['credit_association'], 2), 'var(--info)', false];
+                    $rows[] = ['Credit Association (10%)', '- ' . number_format($latest_ded['credit_association'], 2), 'var(--info)', false];
                 if ((float)$latest_ded['renaissance_dam'] > 0)
-                    $rows[] = ['Renaissance Dam (1%)', 'âˆ’ ' . number_format($latest_ded['renaissance_dam'], 2), 'var(--info)', false];
+                    $rows[] = ['Renaissance Dam (1%)', '- ' . number_format($latest_ded['renaissance_dam'], 2), 'var(--info)', false];
                 if ((float)$latest_ded['loan_repayment'] > 0)
-                    $rows[] = ['Loan Repayment', 'âˆ’ ' . number_format($latest_ded['loan_repayment'], 2), 'var(--warning)', false];
+                    $rows[] = ['Loan Repayment', '- ' . number_format($latest_ded['loan_repayment'], 2), 'var(--warning)', false];
                 if (((float)$latest_ded['penalty'] + (float)$latest_ded['other']) > 0)
-                    $rows[] = ['Penalty / Other', 'âˆ’ ' . number_format((float)$latest_ded['penalty'] + (float)$latest_ded['other'], 2), 'var(--danger)', false];
+                    $rows[] = ['Penalty / Other', '- ' . number_format((float)$latest_ded['penalty'] + (float)$latest_ded['other'], 2), 'var(--danger)', false];
             }
             $rows[] = ['NET PAY', number_format($latest['net_pay'], 2), 'var(--success)', true];
             foreach ($rows as $row): ?>
@@ -255,7 +255,7 @@ $status_badge = [
             <div style="margin-top:14px;padding:10px 12px;background:var(--info-light);
                         border-radius:var(--radius);font-size:0.78rem;color:var(--info);text-align:center;">
                 <i class="fas fa-shield-alt"></i>
-                Employer 18%): <strong>ETB <?= number_format($latest['pension_employer'], 2) ?></strong> &rdquo;” paid by BiT
+                Employer Pension (18%): <strong>ETB <?= number_format($latest['pension_employer'], 2) ?></strong> &mdash; paid by BiT
             </div>
 
             <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -277,7 +277,7 @@ $status_badge = [
         </div>
     </div>
 
-    <!-- â”€â”€ Recent Payslips + Personal Info â”€â”€ -->
+    <!-- ── Recent Payslips + Personal Info ── -->
     <div style="display:flex;flex-direction:column;gap:20px;">
 
         <!-- Recent Payslips -->
@@ -364,7 +364,7 @@ $status_badge = [
     </div>
 </div>
 
-<!-- â”€â”€ Annual Summary â”€â”€ -->
+<!-- ── Annual Summary ── -->
 <?php if ($annual_data && $annual_data['total_gross'] > 0): ?>
 <div class="card">
     <div class="card-header">

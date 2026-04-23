@@ -1,6 +1,6 @@
-﻿<?php
+<?php
 // ============================================================
-// BiT Payroll &rdquo;” Email Helper using PHPMailer + Gmail SMTP
+// BiT Payroll &mdash; Email Helper using PHPMailer + Gmail SMTP
 // ============================================================
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -11,25 +11,25 @@ require_once __DIR__ . '/../vendor/phpmailer/Exception.php';
 require_once __DIR__ . '/../vendor/phpmailer/PHPMailer.php';
 require_once __DIR__ . '/../vendor/phpmailer/SMTP.php';
 
-// â”€â”€ Gmail SMTP Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Gmail SMTP Configuration ───────────────────────────────
 // IMPORTANT: Use a Gmail App Password, NOT your real Gmail password.
 // Steps to get App Password:
-//   1. Go to myaccount.google.com â†’ Security
+//   1. Go to myaccount.google.com → Security
 //   2. Enable 2-Step Verification
-//   3. Go to Security â†’ App passwords
-//   4. Select "Mail" + "Windows Computer" â†’ Generate
+//   3. Go to Security → App passwords
+//   4. Select "Mail" + "Windows Computer" → Generate
 //   5. Copy the 16-character password and paste below
 
 define('MAIL_HOST',     'smtp.gmail.com');
 define('MAIL_PORT',     587);
-define('MAIL_USERNAME', 'your_gmail@gmail.com');   // â† Change to your Gmail
-define('MAIL_PASSWORD', 'xxxx xxxx xxxx xxxx');    // â† Change to your App Password
-define('MAIL_FROM',     'your_gmail@gmail.com');   // â† Same as username
+define('MAIL_USERNAME', 'your_gmail@gmail.com');   // ← Change to your Gmail
+define('MAIL_PASSWORD', 'xxxx xxxx xxxx xxxx');    // ← Change to your App Password
+define('MAIL_FROM',     'your_gmail@gmail.com');   // ← Same as username
 define('MAIL_FROM_NAME','BiT Payroll System');
 define('MAIL_ENABLED',  true);  // Set false to disable all emails
 
 /**
- * Send an HTML email &rdquo;” reads config from DB or falls back to constants
+ * Send an HTML email &mdash; reads config from DB or falls back to constants
  */
 function sendMail(string $to_email, string $to_name, string $subject, string $html_body): array {
     // Try to load settings from DB
@@ -66,7 +66,7 @@ function sendMail(string $to_email, string $to_name, string $subject, string $ht
     }
 
     if (empty($username) || $username === 'your_gmail@gmail.com') {
-        return ['success' => false, 'error' => 'Gmail not configured. Go to Admin â†’ Email Settings.'];
+        return ['success' => false, 'error' => 'Gmail not configured. Go to Admin → Email Settings.'];
     }
 
     $mail = new PHPMailer(true);
@@ -170,7 +170,7 @@ function buildWelcomeEmail(string $full_name, string $username, string $password
           <td style="padding:20px 24px;">
             <p style="font-size:0.8rem;color:#1565C0;font-weight:700;text-transform:uppercase;
                       letter-spacing:1px;margin:0 0 14px;">
-              ðŸ” Your Login Credentials
+              🔐 Your Login Credentials
             </p>
             <table cellpadding="0" cellspacing="0">
               <tr>
@@ -214,8 +214,8 @@ function buildWelcomeEmail(string $full_name, string $username, string $password
         <tr>
           <td style="padding:14px 18px;">
             <p style="color:#E65100;font-size:0.85rem;margin:0;">
-              âš ï¸ <strong>Important:</strong> Please change your password immediately after your first login
-              for security purposes. Go to <em>My Profile â†’ Change Password</em>.
+              ⚠️ <strong>Important:</strong> Please change your password immediately after your first login
+              for security purposes. Go to <em>My Profile → Change Password</em>.
             </p>
           </td>
         </tr>
@@ -227,7 +227,7 @@ function buildWelcomeEmail(string $full_name, string $username, string $password
            style="display:inline-block;background:linear-gradient(135deg,#1565C0,#1976D2);
                   color:white;text-decoration:none;padding:14px 40px;border-radius:8px;
                   font-weight:700;font-size:1rem;letter-spacing:0.3px;">
-          â†’ Login to BiT Payroll System
+          → Login to BiT Payroll System
         </a>
       </div>
 
@@ -286,27 +286,27 @@ function buildWelcomeEmail(string $full_name, string $username, string $password
 function getFeatureRows(string $role): string {
     $features = match($role) {
         'admin' => [
-            'ðŸ‘¥ Manage all user accounts and assign roles',
-            'ðŸ” Monitor system security and audit logs',
-            'âš™ï¸ Configure system settings and tax brackets',
+            '👥 Manage all user accounts and assign roles',
+            '🔐 Monitor system security and audit logs',
+            '⚙️ Configure system settings and tax brackets',
         ],
         'hr' => [
-            'ðŸ‘¤ Register and manage employee records',
-            'ðŸ’° Set allowances and deductions',
-            'ðŸ“… Submit working days for payroll processing',
-            'ðŸ”„ Update employee status and history',
+            '👤 Register and manage employee records',
+            '💰 Set allowances and deductions',
+            '📅 Submit working days for payroll processing',
+            '🔄 Update employee status and history',
         ],
         'finance' => [
-            'ðŸ’¼ Process monthly payroll calculations',
-            'âœ… Verify and approve payroll data',
-            'ðŸ“„ Generate electronic payslips for all employees',
-            'ðŸ“Š View financial reports and summaries',
+            '💼 Process monthly payroll calculations',
+            '✅ Verify and approve payroll data',
+            '📄 Generate electronic payslips for all employees',
+            '📊 View financial reports and summaries',
         ],
         'employee' => [
-            'ðŸ“„ View and download your monthly payslips',
-            'ðŸ’° Check your salary breakdown and deductions',
-            'ðŸ‘¤ Update your personal profile and photo',
-            'ðŸ”” Receive notifications about your payroll',
+            '📄 View and download your monthly payslips',
+            '💰 Check your salary breakdown and deductions',
+            '👤 Update your personal profile and photo',
+            '🔔 Receive notifications about your payroll',
         ],
         default => ['Access the BiT Payroll Management System'],
     };
@@ -332,7 +332,7 @@ function buildPasswordResetEmail(string $full_name, string $username,
     return '
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>Password Reset &rdquo;” BiT Payroll</title></head>
+<head><meta charset="UTF-8"><title>Password Reset &mdash; BiT Payroll</title></head>
 <body style="margin:0;padding:0;background:#f0f4f8;font-family:\'Segoe UI\',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:30px 0;">
 <tr><td align="center">
@@ -366,7 +366,7 @@ function buildPasswordResetEmail(string $full_name, string $username,
         <tr>
           <td style="padding:18px 22px;">
             <p style="font-size:0.78rem;color:#1565C0;font-weight:700;text-transform:uppercase;margin:0 0 12px;">
-              ðŸ” Updated Credentials
+              🔐 Updated Credentials
             </p>
             <table cellpadding="0" cellspacing="0">
               <tr>
@@ -393,7 +393,7 @@ function buildPasswordResetEmail(string $full_name, string $username,
         <tr>
           <td style="padding:12px 16px;">
             <p style="color:#C62828;font-size:0.85rem;margin:0;">
-              âš ï¸ <strong>Security Alert:</strong> If you did not request this password reset,
+              ⚠️ <strong>Security Alert:</strong> If you did not request this password reset,
               please contact your administrator immediately.
             </p>
           </td>
@@ -404,12 +404,12 @@ function buildPasswordResetEmail(string $full_name, string $username,
         <a href="' . htmlspecialchars($login_url) . '"
            style="display:inline-block;background:#1565C0;color:white;text-decoration:none;
                   padding:12px 36px;border-radius:8px;font-weight:700;font-size:0.95rem;">
-          â†’ Login Now
+          → Login Now
         </a>
       </div>
 
       <p style="color:#546E7A;font-size:0.85rem;line-height:1.7;margin:0;">
-        Please change your password after logging in via <em>My Profile â†’ Change Password</em>.
+        Please change your password after logging in via <em>My Profile → Change Password</em>.
       </p>
     </td>
   </tr>
@@ -417,7 +417,7 @@ function buildPasswordResetEmail(string $full_name, string $username,
   <tr>
     <td style="background:#0D47A1;border-radius:0 0 12px 12px;padding:20px 40px;text-align:center;">
       <p style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin:0;">
-        &copy; ' . $year . ' Bahir Dar Institute of Technology &rdquo;” BiT Payroll System
+        &copy; ' . $year . ' Bahir Dar Institute of Technology &mdash; BiT Payroll System
       </p>
     </td>
   </tr>

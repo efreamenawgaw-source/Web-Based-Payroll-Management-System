@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 session_start();
 $page_title = 'My Profile';
 $active_nav = 'profile';
@@ -8,7 +8,7 @@ require_once $depth . 'includes/header.php';
 
 $pdo = getDB();
 
-// â”€â”€ Get full employee record â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Get full employee record ───────────────────────────────
 $emp_stmt = $pdo->prepare("
     SELECT e.*,
            d.dept_name,
@@ -32,7 +32,7 @@ if (!$employee) {
 
 $emp_id = $employee['emp_id'];
 
-// â”€â”€ Current allowances â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Current allowances ─────────────────────────────────────
 $allow_stmt = $pdo->prepare("
     SELECT * FROM allowances
     WHERE emp_id = ? AND effective_to IS NULL
@@ -41,7 +41,7 @@ $allow_stmt = $pdo->prepare("
 $allow_stmt->execute([$emp_id]);
 $allowances = $allow_stmt->fetch();
 
-// â”€â”€ Latest payroll record â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Latest payroll record ──────────────────────────────────
 $latest_pr = $pdo->prepare("
     SELECT pr.*,
            pp.period_label, pp.period_month, pp.period_year,
@@ -58,7 +58,7 @@ $latest_pr = $pdo->prepare("
 $latest_pr->execute([$emp_id]);
 $latest = $latest_pr->fetch();
 
-// â”€â”€ Latest deductions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Latest deductions ──────────────────────────────────────
 $latest_ded = null;
 if ($latest) {
     $dv = $pdo->prepare("
@@ -80,7 +80,7 @@ $gerd = ($latest_ded && (float)$latest_ded['renaissance_dam'] > 0)
 $loan    = $latest_ded ? (float)$latest_ded['loan_repayment'] : 0;
 $penalty = $latest_ded ? (float)($latest_ded['penalty'] + $latest_ded['other']) : 0;
 
-// â”€â”€ Status change history â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Status change history ──────────────────────────────────
 $status_hist = $pdo->prepare("
     SELECT h.previous_status, h.new_status, h.effective_date, h.reason,
            u.full_name AS changed_by
@@ -93,7 +93,7 @@ $status_hist = $pdo->prepare("
 $status_hist->execute([$emp_id]);
 $status_history = $status_hist->fetchAll();
 
-// â”€â”€ Gross salary calculation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Gross salary calculation ───────────────────────────────
 $total_allowances = $allowances
     ? (float)$allowances['housing'] + (float)$allowances['transport']
       + (float)$allowances['position_allowance'] + (float)$allowances['teaching']
@@ -121,24 +121,22 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
     <p>View your profile, salary structure, allowances, and deduction details.</p>
 </div>
 
-<!-- â”€â”€ Profile Header â”€â”€ -->
+<!-- ── Profile Header ── -->
 <div class="card mb-3">
     <div class="card-body">
-        <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+        <div class="profile-header-inner">
             <!-- Avatar -->
-            <div style="width:80px;height:80px;border-radius:50%;background:var(--primary);
-                        display:flex;align-items:center;justify-content:center;
-                        color:white;font-size:2rem;font-weight:700;flex-shrink:0;">
+            <div class="profile-avatar">
                 <?= $initials ?>
             </div>
             <!-- Info -->
-            <div style="flex:1;min-width:0;">
+            <div class="profile-info">
                 <h2 style="margin:0 0 4px;"><?= htmlspecialchars($employee['full_name']) ?></h2>
                 <p style="color:var(--gray-600);margin:0 0 8px;">
-                    <?= htmlspecialchars($employee['position']) ?> &rdquo;”
+                    <?= htmlspecialchars($employee['position']) ?> &mdash;
                     <?= htmlspecialchars($employee['dept_name']) ?>
                 </p>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
                     <span class="badge <?= $status_badge[$employee['status']] ?? 'badge-gray' ?>">
                         <?= ucfirst(str_replace('_', ' ', $employee['status'])) ?>
                     </span>
@@ -149,15 +147,15 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
                 </div>
             </div>
             <!-- Contact -->
-            <div style="text-align:right;flex-shrink:0;">
+            <div class="profile-contact">
                 <?php if ($employee['email']): ?>
-                <p style="font-size:0.78rem;color:var(--gray-400);margin:0;">Email</p>
-                <p style="font-weight:600;margin:0 0 6px;font-size:0.88rem;">
+                <p style="font-size:0.75rem;color:var(--gray-400);margin:0;">Email</p>
+                <p style="font-weight:600;margin:0 0 8px;font-size:0.88rem;word-break:break-all;">
                     <?= htmlspecialchars($employee['email']) ?>
                 </p>
                 <?php endif; ?>
                 <?php if ($employee['phone']): ?>
-                <p style="font-size:0.78rem;color:var(--gray-400);margin:0;">Phone</p>
+                <p style="font-size:0.75rem;color:var(--gray-400);margin:0;">Phone</p>
                 <p style="font-weight:600;margin:0;font-size:0.88rem;">
                     <?= htmlspecialchars($employee['phone']) ?>
                 </p>
@@ -169,7 +167,7 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
 
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-    <!-- â”€â”€ Personal Details â”€â”€ -->
+    <!-- ── Personal Details ── -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-user" style="color:var(--primary);margin-right:8px"></i>
@@ -181,15 +179,15 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
             $personal = [
                 ['Full Name',       $employee['full_name'],                                    'fas fa-user'],
                 ['Employee ID',     $employee['emp_id'],                                       'fas fa-id-badge'],
-                ['Gender',          ucfirst($employee['gender'] ?? '&rdquo;”'),                       'fas fa-venus-mars'],
+                ['Gender',          ucfirst($employee['gender'] ?? '&mdash;'),                       'fas fa-venus-mars'],
                 ['Date of Birth',   $employee['date_of_birth']
                                     ? date('M d, Y', strtotime($employee['date_of_birth']))
-                                    : '&rdquo;”',                                                     'fas fa-birthday-cake'],
-                ['Email',           $employee['email'] ?? '&rdquo;”',                                 'fas fa-envelope'],
-                ['Phone',           $employee['phone'] ?? '&rdquo;”',                                 'fas fa-phone'],
+                                    : '&mdash;',                                                     'fas fa-birthday-cake'],
+                ['Email',           $employee['email'] ?? '&mdash;',                                 'fas fa-envelope'],
+                ['Phone',           $employee['phone'] ?? '&mdash;',                                 'fas fa-phone'],
                 ['Employment Date', $employee['employment_date']
                                     ? date('M d, Y', strtotime($employee['employment_date']))
-                                    : '&rdquo;”',                                                     'fas fa-calendar-check'],
+                                    : '&mdash;',                                                     'fas fa-calendar-check'],
                 ['Employment Type', ucfirst(str_replace('_', '-', $employee['employment_type'])), 'fas fa-briefcase'],
                 ['Username',        $employee['username'],                                     'fas fa-user-circle'],
                 ['Last Login',      $employee['last_login']
@@ -215,7 +213,7 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
         </div>
     </div>
 
-    <!-- â”€â”€ Employment & Salary â”€â”€ -->
+    <!-- ── Employment & Salary ── -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-briefcase" style="color:var(--primary);margin-right:8px"></i>
@@ -255,7 +253,7 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
 
 </div>
 
-<!-- â”€â”€ Deductions Breakdown â”€â”€ -->
+<!-- ── Deductions Breakdown ── -->
 <div class="card mb-3">
     <div class="card-header">
         <h3><i class="fas fa-receipt" style="color:var(--danger);margin-right:8px"></i>
@@ -296,7 +294,7 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
             <?php
             $ded_cards = [
                 ['Income Tax',           $income_tax,  'var(--danger)',  'fas fa-percent',         'Based on 2025 tax brackets'],
-                ['Employee 18% of basic salary'],
+                ['Employee Pension (11% of basic salary)'],
                 ['Credit Association',   $credit_assoc,'var(--info)',    'fas fa-handshake',       '10% of basic salary'],
                 ['Renaissance Dam',      $gerd,        'var(--primary)', 'fas fa-water',           '1% of basic salary'],
             ];
@@ -329,8 +327,8 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
                     <?= $latest ? htmlspecialchars($latest['period_label']) : 'Estimated' ?> Net Pay
                 </p>
                 <p style="font-size:0.78rem;color:var(--gray-600);margin:4px 0 0;">
-                    Gross (<?= number_format($gross_used, 2) ?>) âˆ’ Tax âˆ’ Pension âˆ’ Credit âˆ’ GERD
-                    <?= $loan > 0 ? 'âˆ’ Loan' : '' ?>
+                    Gross (<?= number_format($gross_used, 2) ?>) - Tax - Pension - Credit - GERD
+                    <?= $loan > 0 ? '- Loan' : '' ?>
                 </p>
                 <p style="font-size:0.7rem;color:var(--gray-400);margin:3px 0 0;">
                     <i class="fas fa-gavel"></i> Tax: Revised Monthly Employment Tax Brackets 2025
@@ -347,14 +345,14 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
                     display:flex;align-items:center;gap:8px;">
             <i class="fas fa-shield-alt"></i>
             <span>
-                Employer 18% of basic): <strong>ETB <?= number_format($pension_org, 2) ?></strong>
-                &rdquo;” paid by BiT on your behalf. Not deducted from your salary.
+                Employer Pension (18%): <strong>ETB <?= number_format($pension_org, 2) ?></strong>
+                &mdash; paid by BiT on your behalf. Not deducted from your salary.
             </span>
         </div>
     </div>
 </div>
 
-<!-- â”€â”€ Status History â”€â”€ -->
+<!-- ── Status History ── -->
 <?php if (!empty($status_history)): ?>
 <div class="card">
     <div class="card-header">
@@ -388,7 +386,7 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
                             </span>
                         </td>
                         <td class="text-muted"><?= htmlspecialchars($h['effective_date']) ?></td>
-                        <td style="font-size:0.82rem;"><?= htmlspecialchars($h['reason'] ?? '&rdquo;”') ?></td>
+                        <td style="font-size:0.82rem;"><?= htmlspecialchars($h['reason'] ?? '&mdash;') ?></td>
                         <td class="text-muted"><?= htmlspecialchars($h['changed_by'] ?? 'HR') ?></td>
                     </tr>
                     <?php endforeach; ?>

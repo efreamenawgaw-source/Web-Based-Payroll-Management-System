@@ -83,13 +83,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
 
             // Notify admin
             notify_role($pdo, 'admin',
-                'Payroll Verified &rdquo;” ' . $plabel,
+                'Payroll Verified &mdash; ' . $plabel,
                 "Finance has verified and approved payroll for {$plabel}. Payslips can now be generated.",
                 'success');
 
             // Notify HR
             notify_role($pdo, 'hr',
-                'Payroll Verified &rdquo;” ' . $plabel,
+                'Payroll Verified &mdash; ' . $plabel,
                 "Payroll for {$plabel} has been verified. Payslips will be generated shortly.",
                 'success');
 
@@ -243,7 +243,7 @@ require_once $depth . 'includes/header.php';
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-chart-pie" style="color:var(--primary);margin-right:8px"></i>
-                <?= $sel_period ? htmlspecialchars($sel_period['period_label']) . ' &rdquo;” Summary' : 'Select a Period' ?>
+                <?= $sel_period ? htmlspecialchars($sel_period['period_label']) . ' &mdash; Summary' : 'Select a Period' ?>
             </h3>
             <?php if ($sel_period): ?>
             <span class="badge <?= $status_badge[$sel_period['status']] ?? 'badge-gray' ?>">
@@ -288,7 +288,7 @@ require_once $depth . 'includes/header.php';
                     </div>
                     <button type="submit" name="reject" class="btn btn-danger w-100"
                             onclick="return confirm('Reject and send back for re-processing?')">
-                        <i class="fas fa-times"></i> Reject &rdquo;” Send Back
+                        <i class="fas fa-times"></i> Reject &mdash; Send Back
                     </button>
                 </form>
             </div>
@@ -357,7 +357,7 @@ require_once $depth . 'includes/header.php';
                         <td class="text-bold" style="color:var(--success);font-size:1rem;"><?= number_format($r['net_pay'], 2) ?></td>
                         <td>
                             <span class="badge <?= $r['tax_bracket'] === '0%' ? 'badge-success' : 'badge-warning' ?>">
-                                <?= htmlspecialchars($r['tax_bracket'] ?? '&rdquo;”') ?>
+                                <?= htmlspecialchars($r['tax_bracket'] ?? '&mdash;') ?>
                             </span>
                         </td>
                     </tr>
