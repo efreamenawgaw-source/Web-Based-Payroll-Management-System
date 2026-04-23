@@ -152,7 +152,7 @@ $status_badge = [
             <h2>
                 <?= $annual_data['total_gross']
                     ? 'ETB ' . number_format($annual_data['total_gross'], 0)
-                    : 'â€”' ?>
+                    : '&rdquo;”' ?>
             </h2>
             <span class="stat-change up">
                 <?= $annual_data['months_paid'] ?? 0 ?> months paid
@@ -166,7 +166,7 @@ $status_badge = [
             <h2>
                 <?= $latest
                     ? 'ETB ' . number_format($latest['net_pay'], 0)
-                    : 'â€”' ?>
+                    : '&rdquo;”' ?>
             </h2>
             <span class="stat-change up">
                 <?= $latest ? htmlspecialchars($latest['period_label']) : 'No payslip yet' ?>
@@ -191,7 +191,7 @@ $status_badge = [
                 <?php if ($latest):
                     $total_ded = $latest['income_tax'] + $latest['pension_employee'] + $latest['other_deductions'];
                     echo 'ETB ' . number_format($total_ded, 0);
-                else: ?>â€”<?php endif; ?>
+                else: ?>&rdquo;”<?php endif; ?>
             </h2>
             <span class="stat-change down">Tax + Pension + Other</span>
         </div>
@@ -205,7 +205,7 @@ $status_badge = [
         <div class="card-header">
             <h3>
                 <i class="fas fa-file-invoice-dollar" style="color:var(--primary);margin-right:8px"></i>
-                <?= $latest ? htmlspecialchars($latest['period_label']) . ' â€” Breakdown' : 'No Payslip Yet' ?>
+                <?= $latest ? htmlspecialchars($latest['period_label']) . ' &rdquo;” Breakdown' : 'No Payslip Yet' ?>
             </h3>
             <?php if ($latest): ?>
             <span class="badge badge-success">Available</span>
@@ -255,7 +255,7 @@ $status_badge = [
             <div style="margin-top:14px;padding:10px 12px;background:var(--info-light);
                         border-radius:var(--radius);font-size:0.78rem;color:var(--info);text-align:center;">
                 <i class="fas fa-shield-alt"></i>
-                Employer 18%): <strong>ETB <?= number_format($latest['pension_employer'], 2) ?></strong> â€” paid by BiT
+                Employer 18%): <strong>ETB <?= number_format($latest['pension_employer'], 2) ?></strong> &rdquo;” paid by BiT
             </div>
 
             <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">

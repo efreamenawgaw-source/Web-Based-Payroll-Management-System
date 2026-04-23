@@ -137,7 +137,7 @@ $status_badge = [
             <h2>
                 <?= $latest_period
                     ? 'ETB ' . number_format($latest_period['total_net'], 0)
-                    : 'â€”' ?>
+                    : '&rdquo;”' ?>
             </h2>
             <span class="stat-change up">
                 <?= $latest_period ? htmlspecialchars($latest_period['period_label']) : 'No data yet' ?>
@@ -183,7 +183,7 @@ $status_badge = [
             <h3>
                 <i class="fas fa-chart-pie" style="color:var(--primary);margin-right:8px"></i>
                 <?= $latest_period
-                    ? htmlspecialchars($latest_period['period_label']) . ' â€” Summary'
+                    ? htmlspecialchars($latest_period['period_label']) . ' &rdquo;” Summary'
                     : 'No Payroll Processed Yet' ?>
             </h3>
             <?php if ($latest_period): ?>
@@ -274,7 +274,7 @@ $status_badge = [
             <div style="background:var(--bg-light);border-radius:var(--radius);padding:14px;">
                 <h4 style="font-size:0.82rem;color:var(--primary);margin-bottom:10px;">
                     <i class="fas fa-calendar-check"></i>
-                    <?= $cur_label ?> â€” Readiness
+                    <?= $cur_label ?> &rdquo;” Readiness
                 </h4>
                 <?php
                 $readiness = [
@@ -302,11 +302,11 @@ $status_badge = [
 
                 <!-- Tax rules reminder -->
                 <div style="margin-top:12px;font-size:0.78rem;color:var(--gray-600);line-height:1.8;">
-                    <div>â€¢ Employee 11%</strong> of basic salary</div>
-                    <div>â€¢ Employer 18%</strong> of basic salary</div>
-                    <div>â€¢ Credit Association: <strong>10%</strong> of basic salary</div>
-                    <div>â€¢ Renaissance Dam: <strong>1%</strong> of basic salary</div>
-                    <div>â€¢ Income Tax: <strong>2025 Brackets</strong> on gross earnings</div>
+                    <div>&rdquo;¢ Employee 11%</strong> of basic salary</div>
+                    <div>&rdquo;¢ Employer 18%</strong> of basic salary</div>
+                    <div>&rdquo;¢ Credit Association: <strong>10%</strong> of basic salary</div>
+                    <div>&rdquo;¢ Renaissance Dam: <strong>1%</strong> of basic salary</div>
+                    <div>&rdquo;¢ Income Tax: <strong>2025 Brackets</strong> on gross earnings</div>
                 </div>
             </div>
         </div>
@@ -414,7 +414,7 @@ $status_badge = [
                             <td><strong><?= htmlspecialchars($p['period_label']) ?></strong></td>
                             <td><?= $p['emp_count'] ?></td>
                             <td class="text-success text-bold">
-                                <?= $p['total_net'] ? number_format($p['total_net'], 2) : 'â€”' ?>
+                                <?= $p['total_net'] ? number_format($p['total_net'], 2) : '&rdquo;”' ?>
                             </td>
                             <td>
                                 <?php if ($p['payslips_count'] > 0): ?>

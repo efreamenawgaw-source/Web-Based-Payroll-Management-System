@@ -135,7 +135,7 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
             <div style="flex:1;min-width:0;">
                 <h2 style="margin:0 0 4px;"><?= htmlspecialchars($employee['full_name']) ?></h2>
                 <p style="color:var(--gray-600);margin:0 0 8px;">
-                    <?= htmlspecialchars($employee['position']) ?> â€”
+                    <?= htmlspecialchars($employee['position']) ?> &rdquo;”
                     <?= htmlspecialchars($employee['dept_name']) ?>
                 </p>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -181,15 +181,15 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
             $personal = [
                 ['Full Name',       $employee['full_name'],                                    'fas fa-user'],
                 ['Employee ID',     $employee['emp_id'],                                       'fas fa-id-badge'],
-                ['Gender',          ucfirst($employee['gender'] ?? 'â€”'),                       'fas fa-venus-mars'],
+                ['Gender',          ucfirst($employee['gender'] ?? '&rdquo;”'),                       'fas fa-venus-mars'],
                 ['Date of Birth',   $employee['date_of_birth']
                                     ? date('M d, Y', strtotime($employee['date_of_birth']))
-                                    : 'â€”',                                                     'fas fa-birthday-cake'],
-                ['Email',           $employee['email'] ?? 'â€”',                                 'fas fa-envelope'],
-                ['Phone',           $employee['phone'] ?? 'â€”',                                 'fas fa-phone'],
+                                    : '&rdquo;”',                                                     'fas fa-birthday-cake'],
+                ['Email',           $employee['email'] ?? '&rdquo;”',                                 'fas fa-envelope'],
+                ['Phone',           $employee['phone'] ?? '&rdquo;”',                                 'fas fa-phone'],
                 ['Employment Date', $employee['employment_date']
                                     ? date('M d, Y', strtotime($employee['employment_date']))
-                                    : 'â€”',                                                     'fas fa-calendar-check'],
+                                    : '&rdquo;”',                                                     'fas fa-calendar-check'],
                 ['Employment Type', ucfirst(str_replace('_', '-', $employee['employment_type'])), 'fas fa-briefcase'],
                 ['Username',        $employee['username'],                                     'fas fa-user-circle'],
                 ['Last Login',      $employee['last_login']
@@ -348,7 +348,7 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
             <i class="fas fa-shield-alt"></i>
             <span>
                 Employer 18% of basic): <strong>ETB <?= number_format($pension_org, 2) ?></strong>
-                â€” paid by BiT on your behalf. Not deducted from your salary.
+                &rdquo;” paid by BiT on your behalf. Not deducted from your salary.
             </span>
         </div>
     </div>
@@ -388,7 +388,7 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
                             </span>
                         </td>
                         <td class="text-muted"><?= htmlspecialchars($h['effective_date']) ?></td>
-                        <td style="font-size:0.82rem;"><?= htmlspecialchars($h['reason'] ?? 'â€”') ?></td>
+                        <td style="font-size:0.82rem;"><?= htmlspecialchars($h['reason'] ?? '&rdquo;”') ?></td>
                         <td class="text-muted"><?= htmlspecialchars($h['changed_by'] ?? 'HR') ?></td>
                     </tr>
                     <?php endforeach; ?>

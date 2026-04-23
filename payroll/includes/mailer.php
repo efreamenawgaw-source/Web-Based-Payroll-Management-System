@@ -1,6 +1,6 @@
 ﻿<?php
 // ============================================================
-// BiT Payroll â€” Email Helper using PHPMailer + Gmail SMTP
+// BiT Payroll &rdquo;” Email Helper using PHPMailer + Gmail SMTP
 // ============================================================
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -29,7 +29,7 @@ define('MAIL_FROM_NAME','BiT Payroll System');
 define('MAIL_ENABLED',  true);  // Set false to disable all emails
 
 /**
- * Send an HTML email â€” reads config from DB or falls back to constants
+ * Send an HTML email &rdquo;” reads config from DB or falls back to constants
  */
 function sendMail(string $to_email, string $to_name, string $subject, string $html_body): array {
     // Try to load settings from DB
@@ -332,7 +332,7 @@ function buildPasswordResetEmail(string $full_name, string $username,
     return '
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>Password Reset â€” BiT Payroll</title></head>
+<head><meta charset="UTF-8"><title>Password Reset &rdquo;” BiT Payroll</title></head>
 <body style="margin:0;padding:0;background:#f0f4f8;font-family:\'Segoe UI\',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:30px 0;">
 <tr><td align="center">
@@ -417,7 +417,7 @@ function buildPasswordResetEmail(string $full_name, string $username,
   <tr>
     <td style="background:#0D47A1;border-radius:0 0 12px 12px;padding:20px 40px;text-align:center;">
       <p style="color:rgba(255,255,255,0.6);font-size:0.78rem;margin:0;">
-        &copy; ' . $year . ' Bahir Dar Institute of Technology â€” BiT Payroll System
+        &copy; ' . $year . ' Bahir Dar Institute of Technology &rdquo;” BiT Payroll System
       </p>
     </td>
   </tr>

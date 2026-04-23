@@ -509,11 +509,11 @@ require_once $depth . 'includes/header.php';
                 </div>
                 <div style="padding:8px 12px;background:var(--white);border-radius:6px;border-left:3px solid var(--warning);">
                     <strong style="color:var(--warning);">Pension (Emp 11%)</strong><br>
-                    7% × Basic Salary
+                    11% × Basic Salary
                 </div>
                 <div style="padding:8px 12px;background:var(--white);border-radius:6px;border-left:3px solid var(--info);">
                     <strong style="color:var(--info);">Pension (Org 18%)</strong><br>
-                    11% × Basic Salary
+                    18% × Basic Salary (paid by BiT)
                 </div>
                 <div style="padding:8px 12px;background:var(--white);border-radius:6px;border-left:3px solid var(--info);">
                     <strong style="color:var(--info);">Credit Association</strong><br>
@@ -525,7 +525,7 @@ require_once $depth . 'includes/header.php';
                 </div>
                 <div style="padding:8px 12px;background:var(--white);border-radius:6px;border-left:3px solid var(--gray-600);">
                     <strong style="color:var(--gray-600);">Net Pay</strong><br>
-                    Gross − Tax − Pension(7%) − Credit(10%) − GERD(1%) − Other
+                    Gross &minus; Tax &minus; Pension(11%) &minus; Credit(10%) &minus; GERD(1%) &minus; Other
                 </div>
             </div>
         </div>
@@ -644,7 +644,9 @@ require_once $depth . 'includes/header.php';
                     </tr>
                     <tr>
                         <th style="background:var(--danger-light);color:var(--danger);">Income Tax</th>
-                        <th style="background:var(--warning-light);color:var(--warning);">Pension 18%</th>
+                        <th style="background:var(--warning-light);color:var(--warning);">Pension 11%
+                            <br><span style="font-weight:400;font-size:0.65rem;">(Employee)</span>
+                        </th>
                         <th style="background:var(--info-light);color:var(--info);">Credit Assoc.
                             <br><span style="font-weight:400;font-size:0.65rem;">(10% default)</span>
                         </th>
@@ -736,14 +738,14 @@ require_once $depth . 'includes/header.php';
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;">
             <?php
             $summary_cards = [
-                ['Total Gross',          $gt['gross'],            'var(--success)'],
-                ['Total Income Tax',     $gt['income_tax'],       'var(--danger)'],
-                ['Total Pension (18%)',   $gt['pension_emp'],      'var(--warning)'],
-                ['Total Pension (18%)',  $gt['pension_org'],      'var(--info)'],
-                ['Credit Association',   $gt['credit_assoc'],     'var(--info)'],
-                ['Renaissance Dam',      $gt['gerd'],             'var(--primary)'],
-                ['Total Deductions',     $gt['total_deductions'], 'var(--danger)'],
-                ['Total Net Pay',        $gt['net_pay'],          'var(--success)'],
+                ['Total Gross',               $gt['gross'],            'var(--success)'],
+                ['Total Income Tax',          $gt['income_tax'],       'var(--danger)'],
+                ['Employee Pension (11%)',    $gt['pension_emp'],      'var(--warning)'],
+                ['Employer Pension (18%)',    $gt['pension_org'],      'var(--info)'],
+                ['Credit Association',        $gt['credit_assoc'],     'var(--info)'],
+                ['Renaissance Dam',           $gt['gerd'],             'var(--primary)'],
+                ['Total Deductions',          $gt['total_deductions'], 'var(--danger)'],
+                ['Total Net Pay',             $gt['net_pay'],          'var(--success)'],
             ];
             foreach ($summary_cards as [$label, $val, $color]): ?>
             <div style="text-align:center;padding:10px;background:var(--gray-100);border-radius:var(--radius);border-top:3px solid <?= $color ?>;">
@@ -771,7 +773,7 @@ require_once $depth . 'includes/header.php';
 <div class="card mt-3">
     <div class="card-header">
         <h3><i class="fas fa-piggy-bank" style="color:var(--info);margin-right:8px"></i>
-            Employer Pension Contribution (11%) — Paid by BiT
+            Employer Pension Contribution (18%) &mdash; Paid by BiT
         </h3>
         <span class="badge badge-info">Not deducted from employee</span>
     </div>

@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_deductions'])) {
         $error = 'Please select an employee.';
     } else {
         try {
-            // Upsert â€” update if exists for this period, insert if not
+            // Upsert &rdquo;” update if exists for this period, insert if not
             $check = $pdo->prepare("
                 SELECT deduction_id FROM deductions
                 WHERE emp_id = ? AND effective_month = ? AND effective_year = ?
@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_deductions'])) {
             $selected_emp_id = $emp_id;
             $f_month = $eff_month;
             $f_year  = $eff_year;
-            $success = "Deductions saved for <strong>{$emp_id}</strong> â€” " .
+            $success = "Deductions saved for <strong>{$emp_id}</strong> &rdquo;” " .
                        date('F', mktime(0,0,0,$eff_month,1)) . " {$eff_year}. " .
                        "Total: <strong>ETB " . number_format($total, 2) . "</strong>";
         } catch (PDOException $e) {
@@ -262,7 +262,7 @@ require_once $depth . 'includes/header.php';
                         <?php foreach ($employees as $e): ?>
                         <option value="<?= htmlspecialchars($e['emp_id']) ?>"
                             <?= $selected_emp_id === $e['emp_id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($e['emp_id']) ?> â€” <?= htmlspecialchars($e['full_name']) ?>
+                            <?= htmlspecialchars($e['emp_id']) ?> &rdquo;” <?= htmlspecialchars($e['full_name']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -278,7 +278,7 @@ require_once $depth . 'includes/header.php';
                         <p style="font-size:0.72rem;color:var(--gray-400);margin:0;text-transform:uppercase;">Employee</p>
                         <p style="font-weight:700;margin:0;"><?= htmlspecialchars($sel_emp['full_name']) ?></p>
                         <p style="font-size:0.8rem;color:var(--gray-600);margin:0;">
-                            <?= htmlspecialchars($sel_emp['position']) ?> â€” <?= htmlspecialchars($sel_emp['dept_name']) ?>
+                            <?= htmlspecialchars($sel_emp['position']) ?> &rdquo;” <?= htmlspecialchars($sel_emp['dept_name']) ?>
                         </p>
                     </div>
                     <div style="text-align:right;">
@@ -289,11 +289,11 @@ require_once $depth . 'includes/header.php';
                     </div>
                 </div>
 
-                <!-- Deduction fields â€” matching spreadsheet columns -->
+                <!-- Deduction fields &rdquo;” matching spreadsheet columns -->
                 <div style="background:var(--gray-100);border-radius:var(--radius);padding:14px;margin-bottom:16px;">
                     <p style="font-size:0.78rem;font-weight:700;color:var(--gray-600);
                                text-transform:uppercase;margin:0 0 12px;">
-                        Other Deductions â€” <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?>
+                        Other Deductions &rdquo;” <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?>
                     </p>
 
                     <?php
@@ -304,7 +304,7 @@ require_once $depth . 'includes/header.php';
 
                     $ded_fields = [
                         ['credit_association', 'Credit Association (10% of basic)',    'fas fa-handshake',         'var(--info)',     'Default: 10% of basic salary',   $default_credit],
-                        ['renaissance_dam',    'Renaissance Dam â€” GERD (1% of basic)', 'fas fa-water',             'var(--primary)', 'Default: 1% of basic salary',    $default_gerd],
+                        ['renaissance_dam',    'Renaissance Dam &rdquo;” GERD (1% of basic)', 'fas fa-water',             'var(--primary)', 'Default: 1% of basic salary',    $default_gerd],
                         ['loan_repayment',     'Loan Repayment',                       'fas fa-hand-holding-usd',  'var(--warning)', 'Monthly loan installment',       0],
                         ['penalty',            'Penalty / Absence',                    'fas fa-exclamation-triangle','var(--danger)', 'Penalty or absence deduction',  0],
                         ['other',              'Other Deduction',                      'fas fa-minus-circle',      'var(--gray-600)','Any other deduction',            0],
@@ -379,7 +379,7 @@ require_once $depth . 'includes/header.php';
                 <?php if ($sel_ded): ?>
                 <p style="text-align:center;font-size:0.78rem;color:var(--success);margin-top:8px;">
                     <i class="fas fa-check-circle"></i>
-                    Record exists for <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?> â€” will be updated.
+                    Record exists for <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?> &rdquo;” will be updated.
                 </p>
                 <?php endif; ?>
 
@@ -399,7 +399,7 @@ require_once $depth . 'includes/header.php';
         <div class="card-header">
             <h3><i class="fas fa-history" style="color:var(--primary);margin-right:8px"></i>
                 <?= $sel_emp
-                    ? htmlspecialchars($sel_emp['full_name']) . ' â€” History'
+                    ? htmlspecialchars($sel_emp['full_name']) . ' &rdquo;” History'
                     : 'Deduction History' ?>
             </h3>
         </div>
@@ -483,7 +483,7 @@ require_once $depth . 'includes/header.php';
     <div class="card-header">
         <h3>
             <i class="fas fa-table" style="color:var(--primary);margin-right:8px"></i>
-            All Employees â€” Deductions for
+            All Employees &rdquo;” Deductions for
             <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?>
         </h3>
         <!-- Period switcher -->
@@ -534,32 +534,32 @@ require_once $depth . 'includes/header.php';
                         <td style="color:var(--info);">
                             <?= $row['credit_association'] > 0
                                 ? number_format($row['credit_association'], 2)
-                                : '<span class="text-muted">â€”</span>' ?>
+                                : '<span class="text-muted">&rdquo;”</span>' ?>
                         </td>
                         <td style="color:var(--primary);">
                             <?= $row['renaissance_dam'] > 0
                                 ? number_format($row['renaissance_dam'], 2)
-                                : '<span class="text-muted">â€”</span>' ?>
+                                : '<span class="text-muted">&rdquo;”</span>' ?>
                         </td>
                         <td style="color:var(--warning);">
                             <?= $row['loan_repayment'] > 0
                                 ? number_format($row['loan_repayment'], 2)
-                                : '<span class="text-muted">â€”</span>' ?>
+                                : '<span class="text-muted">&rdquo;”</span>' ?>
                         </td>
                         <td style="color:var(--danger);">
                             <?= $row['penalty'] > 0
                                 ? number_format($row['penalty'], 2)
-                                : '<span class="text-muted">â€”</span>' ?>
+                                : '<span class="text-muted">&rdquo;”</span>' ?>
                         </td>
                         <td>
                             <?= $row['other'] > 0
                                 ? number_format($row['other'], 2)
-                                : '<span class="text-muted">â€”</span>' ?>
+                                : '<span class="text-muted">&rdquo;”</span>' ?>
                         </td>
                         <td style="font-weight:700;color:var(--danger);">
                             <?= $row['total_other_deductions'] > 0
                                 ? 'ETB ' . number_format($row['total_other_deductions'], 2)
-                                : '<span class="text-muted">â€”</span>' ?>
+                                : '<span class="text-muted">&rdquo;”</span>' ?>
                         </td>
                         <td>
                             <a href="deductions.php?emp=<?= urlencode($row['emp_id']) ?>&month=<?= $f_month ?>&year=<?= $f_year ?>"

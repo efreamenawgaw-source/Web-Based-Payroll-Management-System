@@ -151,7 +151,7 @@ require_once $depth . 'includes/header.php';
                         <?php foreach ($employees as $e): ?>
                         <option value="<?= htmlspecialchars($e['emp_id']) ?>"
                             <?= $selected_emp_id === $e['emp_id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($e['emp_id']) ?> â€” <?= htmlspecialchars($e['full_name']) ?>
+                            <?= htmlspecialchars($e['emp_id']) ?> &rdquo;” <?= htmlspecialchars($e['full_name']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -165,7 +165,7 @@ require_once $depth . 'includes/header.php';
                             <p style="font-size:0.72rem;color:var(--gray-400);margin:0;text-transform:uppercase;">Employee</p>
                             <p style="font-weight:700;margin:0;"><?= htmlspecialchars($sel_emp['full_name']) ?></p>
                             <p style="font-size:0.8rem;color:var(--gray-600);margin:0;">
-                                <?= htmlspecialchars($sel_emp['position']) ?> â€” <?= htmlspecialchars($sel_emp['dept_name']) ?>
+                                <?= htmlspecialchars($sel_emp['position']) ?> &rdquo;” <?= htmlspecialchars($sel_emp['dept_name']) ?>
                             </p>
                         </div>
                         <div style="text-align:right;">
