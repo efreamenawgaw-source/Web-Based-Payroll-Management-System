@@ -188,6 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['link_employee'])) {
         }
     }
 }
+// ── DEACTIVATE user (soft disable) ────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['deactivate_user'])) {
     $uid = (int)($_POST['del_user_id'] ?? 0);
     if ($uid && $uid !== (int)$_SESSION['user_id']) {
@@ -200,9 +201,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['deactivate_user'])) {
             $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
             "user_id:{$uid}", $_SERVER['REMOTE_ADDR'] ?? null
         ]);
-        $success = 'User account deactivated.';
+        $success = 'User account <strong>deactivated</strong>. They can no longer login.';
     } else {
         $error = 'Cannot deactivate your own account.';
+    }
+}
+
+// ── REACTIVATE user ────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reactivate_user'])) {
+    $uid = (int)($_POST['reactivate_user_id'] ?? 0);
+    if ($uid) {
+        $pdo->prepare("UPDATE users SET is_active = 1 WHERE user_id = ?")
+            ->execute([$uid]);
+        $pdo->prepare("
+            INSERT INTO audit_logs (user_id, username, role, action, target, ip_address)
+            VALUES (?, ?, ?, 'Reactivate User', ?, ?)
+        ")->execute([
+            $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
+            "user_id:{$uid}", $_SERVER['REMOTE_ADDR'] ?? null
+        ]);
+        $success = 'User account <strong>reactivated</strong>. They can now login.';
+    }
+}
+
+// ── PERMANENTLY DELETE user ────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
+    $uid = (int)($_POST['delete_user_id'] ?? 0);
+    if ($uid && $uid !== (int)$_SESSION['user_id']) {
+        try {
+            // Get user info before deleting
+            $del_info = $pdo->prepare("SELECT username, full_name FROM users WHERE user_id = ?");
+            $del_info->execute([$uid]);
+            $del_row = $del_info->fetch();
+
+            if ($del_row) {
+                // Unlink from employee record first
+                $pdo->prepare("UPDATE employees SET user_id = NULL WHERE user_id = ?")
+                    ->execute([$uid]);
+
+                // Delete the user
+                $pdo->prepare("DELETE FROM users WHERE user_id = ?")
+                    ->execute([$uid]);
+
+                // Audit log (use current admin's ID since user is gone)
+                $pdo->prepare("
+                    INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
+                    VALUES (?, ?, ?, 'Delete User', ?, ?, ?)
+                ")->execute([
+                    $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
+                    $del_row['username'],
+                    "Permanently deleted: {$del_row['full_name']} ({$del_row['username']})",
+                    $_SERVER['REMOTE_ADDR'] ?? null
+                ]);
+
+                $success = "User <strong>{$del_row['full_name']}</strong> ({$del_row['username']}) permanently deleted.";
+            }
+        } catch (PDOException $e) {
+            $error = 'Delete failed: ' . $e->getMessage();
+        }
+    } else {
+        $error = 'Cannot delete your own account.';
     }
 }
 
@@ -398,22 +456,50 @@ require_once $depth . 'includes/header.php';
                         </td>
                         <td>
                             <a href="users.php?edit=<?= $u['user_id'] ?>"
-                               class="btn btn-secondary btn-sm btn-icon-only" title="Edit">
+                               class="btn btn-secondary btn-sm btn-icon-only" title="Edit User">
                                 <i class="fas fa-edit"></i>
                             </a>
                             <a href="roles.php?user=<?= $u['user_id'] ?>"
                                class="btn btn-warning btn-sm btn-icon-only" title="Assign Role">
                                 <i class="fas fa-user-tag"></i>
                             </a>
-                            <?php if ($u['user_id'] !== (int)$_SESSION['user_id'] && $u['is_active']): ?>
+
+                            <?php if ($u['user_id'] !== (int)$_SESSION['user_id']): ?>
+
+                            <?php if ($u['is_active']): ?>
+                            <!-- Deactivate -->
                             <form method="POST" style="display:inline;"
-                                  onsubmit="return confirm('Deactivate <?= htmlspecialchars(addslashes($u['username'])) ?>?')">
+                                  onsubmit="return confirm('Deactivate <?= htmlspecialchars(addslashes($u['full_name'])) ?>? They will not be able to login.')">
                                 <input type="hidden" name="del_user_id" value="<?= $u['user_id'] ?>">
                                 <button type="submit" name="deactivate_user"
-                                        class="btn btn-danger btn-sm btn-icon-only" title="Deactivate">
+                                        class="btn btn-warning btn-sm btn-icon-only"
+                                        title="Deactivate (disable login)">
                                     <i class="fas fa-user-slash"></i>
                                 </button>
                             </form>
+                            <?php else: ?>
+                            <!-- Reactivate -->
+                            <form method="POST" style="display:inline;">
+                                <input type="hidden" name="reactivate_user_id" value="<?= $u['user_id'] ?>">
+                                <button type="submit" name="reactivate_user"
+                                        class="btn btn-success btn-sm btn-icon-only"
+                                        title="Reactivate account">
+                                    <i class="fas fa-user-check"></i>
+                                </button>
+                            </form>
+                            <?php endif; ?>
+
+                            <!-- Permanently Delete -->
+                            <form method="POST" style="display:inline;"
+                                  onsubmit="return confirm('⚠️ PERMANENTLY DELETE <?= htmlspecialchars(addslashes($u['full_name'])) ?>?\n\nThis cannot be undone. All their data will be removed.')">
+                                <input type="hidden" name="delete_user_id" value="<?= $u['user_id'] ?>">
+                                <button type="submit" name="delete_user"
+                                        class="btn btn-danger btn-sm btn-icon-only"
+                                        title="Permanently Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -427,6 +513,16 @@ require_once $depth . 'includes/header.php';
         <span class="text-muted" style="font-size:0.8rem;">
             Showing <?= min($offset+1,$total_rows) ?>–<?= min($offset+$per_page,$total_rows) ?>
             of <?= $total_rows ?> users
+            &nbsp;|&nbsp;
+            <i class="fas fa-edit" style="color:var(--gray-400);"></i> Edit
+            &nbsp;
+            <i class="fas fa-user-tag" style="color:var(--warning);"></i> Role
+            &nbsp;
+            <i class="fas fa-user-slash" style="color:var(--warning);"></i> Deactivate
+            &nbsp;
+            <i class="fas fa-user-check" style="color:var(--success);"></i> Reactivate
+            &nbsp;
+            <i class="fas fa-trash" style="color:var(--danger);"></i> Delete permanently
         </span>
         <?php if ($total_pages > 1): ?>
         <div class="pagination">
@@ -665,8 +761,8 @@ require_once $depth . 'includes/header.php';
 </div>
 <?php endif; ?>
 
-<?php require_once $depth . 'includes/footer.php'; ?>
 <script>
+// Generate a strong random password
 function generatePassword() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!';
     let pass = '';
@@ -676,7 +772,10 @@ function generatePassword() {
     const input = document.getElementById('newUserPass');
     if (input) {
         input.value = pass;
-        input.type  = 'text'; // show it
+        input.type  = 'text';
+        input.focus();
     }
 }
 </script>
+
+<?php require_once $depth . 'includes/footer.php'; ?>

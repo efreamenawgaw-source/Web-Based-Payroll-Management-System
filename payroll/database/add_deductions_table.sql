@@ -89,3 +89,38 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 -- Create uploads directory placeholder
 -- (create folder manually: payroll/assets/uploads/profiles/)
+
+-- ============================================================
+-- Password reset tokens table
+-- ============================================================
+CREATE TABLE IF NOT EXISTS password_resets (
+    reset_id    INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    user_id     INT UNSIGNED    NOT NULL,
+    token       VARCHAR(64)     NOT NULL UNIQUE,
+    expires_at  DATETIME        NOT NULL,
+    used        TINYINT(1)      NOT NULL DEFAULT 0,
+    created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (reset_id),
+    INDEX idx_reset_token   (token),
+    INDEX idx_reset_user    (user_id),
+    INDEX idx_reset_expires (expires_at),
+    CONSTRAINT fk_reset_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Password reset tokens — expire after 30 minutes';
+
+-- ============================================================
+-- Password reset tokens table
+-- ============================================================
+CREATE TABLE IF NOT EXISTS password_resets (
+    reset_id    INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    user_id     INT UNSIGNED    NOT NULL,
+    token       VARCHAR(64)     NOT NULL UNIQUE,
+    expires_at  DATETIME        NOT NULL,
+    used        TINYINT(1)      NOT NULL DEFAULT 0,
+    created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (reset_id),
+    INDEX idx_reset_token   (token),
+    INDEX idx_reset_user    (user_id),
+    CONSTRAINT fk_reset_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Password reset tokens — expire after 30 minutes';

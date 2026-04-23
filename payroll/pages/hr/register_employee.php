@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 $page_title = 'Register Employee';
 $active_nav = 'register';
@@ -11,14 +11,14 @@ $success = '';
 $error   = '';
 $post    = [];   // repopulate form on error
 
-// ── Load departments from DB ───────────────────────────────
+// â”€â”€ Load departments from DB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $departments = $pdo->query("
     SELECT dept_id, dept_name FROM departments
     WHERE  is_active = 1
     ORDER  BY dept_name
 ")->fetchAll();
 
-// ── Handle form submission ─────────────────────────────────
+// â”€â”€ Handle form submission â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $post = $_POST;
 
@@ -165,7 +165,7 @@ require_once $depth . 'includes/header.php';
 <form method="POST" action="" novalidate>
 <div class="grid-2" style="gap:24px;align-items:start;">
 
-    <!-- ── Personal Information ── -->
+    <!-- â”€â”€ Personal Information â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-user" style="color:var(--primary);margin-right:8px"></i>Personal Information</h3>
@@ -185,7 +185,7 @@ require_once $depth . 'includes/header.php';
                            placeholder="e.g. EMP-101"
                            value="<?= htmlspecialchars($post['emp_id'] ?? '') ?>"
                            style="text-transform:uppercase" required>
-                    <span class="form-hint">Must be unique — e.g. EMP-101</span>
+                    <span class="form-hint">Must be unique â€” e.g. EMP-101</span>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Gender <span style="color:var(--danger)">*</span></label>
@@ -220,7 +220,7 @@ require_once $depth . 'includes/header.php';
         </div>
     </div>
 
-    <!-- ── Employment Information ── -->
+    <!-- â”€â”€ Employment Information â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-briefcase" style="color:var(--primary);margin-right:8px"></i>Employment Information</h3>
@@ -295,13 +295,13 @@ require_once $depth . 'includes/header.php';
 
 </div>
 
-<!-- ── Allowances ── -->
+<!-- â”€â”€ Allowances â”€â”€ -->
 <div class="card mt-3">
     <div class="card-header">
         <h3><i class="fas fa-hand-holding-usd" style="color:var(--success);margin-right:8px"></i>
             Initial Allowances (ETB)
         </h3>
-        <span class="text-muted" style="font-size:0.8rem;">Optional — can be updated later</span>
+        <span class="text-muted" style="font-size:0.8rem;">Optional â€” can be updated later</span>
     </div>
     <div class="card-body">
         <div class="form-row">
@@ -341,14 +341,14 @@ require_once $depth . 'includes/header.php';
             <i class="fas fa-info-circle"></i>
             <div>
                 <strong>Auto-calculated on payroll:</strong>
-                Pension (7% employee / 11% employer) and income tax are applied automatically
+                Pension (11% employee / 18% employer) and income tax are applied automatically
                 per <strong>Revised Monthly Employment Tax Brackets 2025</strong>.
             </div>
         </div>
     </div>
 </div>
 
-<!-- ── Actions ── -->
+<!-- â”€â”€ Actions â”€â”€ -->
 <div class="card mt-3">
     <div class="card-body d-flex gap-2" style="justify-content:flex-end;flex-wrap:wrap;">
         <a href="employees.php" class="btn btn-secondary">
@@ -392,3 +392,4 @@ updateGross();
 </script>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
+

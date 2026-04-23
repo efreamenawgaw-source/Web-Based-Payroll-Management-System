@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 $page_title = 'Payroll Reports';
 $active_nav = 'reports';
@@ -8,12 +8,12 @@ require_once $depth . 'includes/header.php';
 
 $pdo = getDB();
 
-// ── Filters ───────────────────────────────────────────────
+// â”€â”€ Filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $f_period_id = (int)($_GET['period_id'] ?? 0);
 $f_dept      = (int)($_GET['dept']      ?? 0);
 $f_type      = trim($_GET['type']       ?? 'monthly');
 
-// ── Load all finalized periods ─────────────────────────────
+// â”€â”€ Load all finalized periods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $all_periods = $pdo->query("
     SELECT period_id, period_label, period_month, period_year, status
     FROM   payroll_periods
@@ -21,12 +21,12 @@ $all_periods = $pdo->query("
     ORDER  BY period_year DESC, period_month DESC
 ")->fetchAll();
 
-// ── Load departments ───────────────────────────────────────
+// â”€â”€ Load departments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $departments = $pdo->query("
     SELECT dept_id, dept_name FROM departments WHERE is_active=1 ORDER BY dept_name
 ")->fetchAll();
 
-// ── Selected period data ───────────────────────────────────
+// â”€â”€ Selected period data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $sel_period = null;
 $report_rows = [];
 $gt = [];
@@ -95,7 +95,7 @@ if ($f_period_id) {
     }
 }
 
-// ── Annual summary (all finalized periods this year) ───────
+// â”€â”€ Annual summary (all finalized periods this year) â”€â”€â”€â”€â”€â”€â”€
 $annual = $pdo->query("
     SELECT
         pp.period_label,
@@ -115,7 +115,7 @@ $annual = $pdo->query("
     ORDER BY pp.period_month ASC
 ")->fetchAll();
 
-// ── Department breakdown for selected period ───────────────
+// â”€â”€ Department breakdown for selected period â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $dept_breakdown = [];
 if ($f_period_id) {
     $db_stmt = $pdo->prepare("
@@ -152,14 +152,14 @@ if ($f_period_id) {
     </button>
 </div>
 
-<!-- ── Filter Bar ── -->
+<!-- â”€â”€ Filter Bar â”€â”€ -->
 <div class="card mb-3">
     <div class="card-body">
         <form method="GET" action="">
             <div class="filter-bar">
                 <div class="form-group" style="margin:0;flex:1;">
                     <select name="period_id" class="form-control" onchange="this.form.submit()">
-                        <option value="">— Select Period —</option>
+                        <option value="">â€” Select Period â€”</option>
                         <?php foreach ($all_periods as $p): ?>
                         <option value="<?= $p['period_id'] ?>"
                             <?= $f_period_id === (int)$p['period_id'] ? 'selected' : '' ?>>
@@ -195,7 +195,7 @@ if ($f_period_id) {
 
 <?php if ($sel_period && !empty($report_rows)): ?>
 
-<!-- ── Summary Cards ── -->
+<!-- â”€â”€ Summary Cards â”€â”€ -->
 <div class="stats-grid" style="margin-bottom:24px;">
     <?php
     $cards = [
@@ -216,12 +216,12 @@ if ($f_period_id) {
     <?php endforeach; ?>
 </div>
 
-<!-- ── Main Report Table ── -->
+<!-- â”€â”€ Main Report Table â”€â”€ -->
 <div class="card mb-3">
     <div class="card-header">
         <h3>
             <i class="fas fa-table" style="color:var(--primary);margin-right:8px"></i>
-            Payroll Report — <?= htmlspecialchars($sel_period['period_label']) ?>
+            Payroll Report â€” <?= htmlspecialchars($sel_period['period_label']) ?>
             <?= $f_dept ? '(' . htmlspecialchars(array_column($departments,'dept_name','dept_id')[$f_dept] ?? '') . ')' : '' ?>
         </h3>
         <div class="d-flex gap-2">
@@ -248,9 +248,9 @@ if ($f_period_id) {
                     </tr>
                     <tr>
                         <th style="background:var(--danger-light);color:var(--danger);">Tax</th>
-                        <th style="background:var(--warning-light);color:var(--warning);">Pension 7%</th>
+                        <th style="background:var(--warning-light);color:var(--warning);">Pension 18%</th>
                         <th style="background:var(--info-light);color:var(--info);">Other</th>
-                        <th style="background:var(--info-light);color:var(--info);">Emp.Pension 11%</th>
+                        <th style="background:var(--info-light);color:var(--info);">Emp.Pension 18%</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -268,11 +268,11 @@ if ($f_period_id) {
                                 <?= $r['working_days'] ?>
                             </span>
                         </td>
-                        <td><?= $r['total_allowances'] > 0 ? number_format($r['total_allowances'], 2) : '—' ?></td>
+                        <td><?= $r['total_allowances'] > 0 ? number_format($r['total_allowances'], 2) : 'â€”' ?></td>
                         <td class="text-bold" style="color:var(--success);"><?= number_format($r['gross_salary'], 2) ?></td>
                         <td style="color:var(--danger);"><?= number_format($r['income_tax'], 2) ?></td>
                         <td style="color:var(--warning);"><?= number_format($r['pension_employee'], 2) ?></td>
-                        <td style="color:var(--info);"><?= $r['other_deductions'] > 0 ? number_format($r['other_deductions'], 2) : '—' ?></td>
+                        <td style="color:var(--info);"><?= $r['other_deductions'] > 0 ? number_format($r['other_deductions'], 2) : 'â€”' ?></td>
                         <td style="color:var(--info);"><?= number_format($r['pension_employer'], 2) ?></td>
                         <td class="text-bold" style="color:var(--danger);"><?= number_format($r['total_deductions'], 2) ?></td>
                         <td class="text-bold" style="color:var(--success);font-size:1rem;"><?= number_format($r['net_pay'], 2) ?></td>
@@ -299,12 +299,12 @@ if ($f_period_id) {
     </div>
 </div>
 
-<!-- ── Department Breakdown ── -->
+<!-- â”€â”€ Department Breakdown â”€â”€ -->
 <?php if (!empty($dept_breakdown)): ?>
 <div class="card mb-3">
     <div class="card-header">
         <h3><i class="fas fa-building" style="color:var(--primary);margin-right:8px"></i>
-            Department Breakdown — <?= htmlspecialchars($sel_period['period_label']) ?>
+            Department Breakdown â€” <?= htmlspecialchars($sel_period['period_label']) ?>
         </h3>
     </div>
     <div class="card-body">
@@ -335,12 +335,12 @@ if ($f_period_id) {
 
 <?php endif; ?>
 
-<!-- ── Annual Summary ── -->
+<!-- â”€â”€ Annual Summary â”€â”€ -->
 <?php if (!empty($annual)): ?>
 <div class="card">
     <div class="card-header">
         <h3><i class="fas fa-chart-bar" style="color:var(--primary);margin-right:8px"></i>
-            Annual Summary — <?= date('Y') ?>
+            Annual Summary â€” <?= date('Y') ?>
         </h3>
         <span class="badge badge-primary"><?= count($annual) ?> months processed</span>
     </div>
@@ -413,3 +413,4 @@ if ($f_period_id) {
 <?php endif; ?>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
+

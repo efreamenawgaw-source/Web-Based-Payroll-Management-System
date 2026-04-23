@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 $page_title = 'Manage Deductions';
 $active_nav = 'deductions';
@@ -12,7 +12,7 @@ $error   = '';
 $cur_month = (int)date('n');
 $cur_year  = (int)date('Y');
 
-// ── Load deduction rates from system_settings ──────────────
+// â”€â”€ Load deduction rates from system_settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $rates = $pdo->query("
     SELECT setting_key, setting_value FROM system_settings
     WHERE  setting_key IN ('credit_association_rate','renaissance_dam_rate')
@@ -25,7 +25,7 @@ $selected_emp_id = trim($_GET['emp'] ?? '');
 $f_month = (int)($_GET['month'] ?? $cur_month);
 $f_year  = (int)($_GET['year']  ?? $cur_year);
 
-// ── SAVE / UPDATE deduction row ────────────────────────────
+// â”€â”€ SAVE / UPDATE deduction row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_deductions'])) {
     $emp_id             = trim($_POST['emp_id']             ?? '');
     $credit_association = (float)($_POST['credit_association'] ?? 0);
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_deductions'])) {
         $error = 'Please select an employee.';
     } else {
         try {
-            // Upsert — update if exists for this period, insert if not
+            // Upsert â€” update if exists for this period, insert if not
             $check = $pdo->prepare("
                 SELECT deduction_id FROM deductions
                 WHERE emp_id = ? AND effective_month = ? AND effective_year = ?
@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_deductions'])) {
             $selected_emp_id = $emp_id;
             $f_month = $eff_month;
             $f_year  = $eff_year;
-            $success = "Deductions saved for <strong>{$emp_id}</strong> — " .
+            $success = "Deductions saved for <strong>{$emp_id}</strong> â€” " .
                        date('F', mktime(0,0,0,$eff_month,1)) . " {$eff_year}. " .
                        "Total: <strong>ETB " . number_format($total, 2) . "</strong>";
         } catch (PDOException $e) {
@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_deductions'])) {
     }
 }
 
-// ── Load active employees ──────────────────────────────────
+// â”€â”€ Load active employees â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $employees = $pdo->query("
     SELECT e.emp_id, e.full_name, e.basic_salary, d.dept_name
     FROM   employees e
@@ -118,7 +118,7 @@ $employees = $pdo->query("
     ORDER  BY e.full_name
 ")->fetchAll();
 
-// ── Selected employee info ─────────────────────────────────
+// â”€â”€ Selected employee info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $sel_emp = null;
 $sel_ded = null;
 if ($selected_emp_id) {
@@ -140,7 +140,7 @@ if ($selected_emp_id) {
     $sel_ded = $ds->fetch();
 }
 
-// ── Monthly deductions overview (all employees) ────────────
+// â”€â”€ Monthly deductions overview (all employees) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $overview = $pdo->query("
     SELECT
         e.emp_id,
@@ -165,7 +165,7 @@ $overview = $pdo->query("
     ORDER BY e.full_name
 ")->fetchAll();
 
-// ── Totals for the month ───────────────────────────────────
+// â”€â”€ Totals for the month â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $totals = [
     'credit_association' => 0,
     'renaissance_dam'    => 0,
@@ -202,12 +202,12 @@ require_once $depth . 'includes/header.php';
 <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <span><?= htmlspecialchars($error) ?></span></div>
 <?php endif; ?>
 
-<!-- ── Info Box ── -->
+<!-- â”€â”€ Info Box â”€â”€ -->
 <div class="alert alert-info mb-3">
     <i class="fas fa-info-circle"></i>
     <div style="font-size:0.88rem;">
         <strong>Deduction Structure:</strong>
-        Income Tax and Pension (7%) are <em>calculated automatically</em> during payroll.
+        Income Tax and Pension (18%) are <em>calculated automatically</em> during payroll.
         The fields below are <em>additional</em> deductions entered by HR:
         <strong>Credit Association</strong>, <strong>Renaissance Dam (GERD)</strong>,
         <strong>Loan Repayment</strong>, <strong>Penalty</strong>, and <strong>Other</strong>.
@@ -217,7 +217,7 @@ require_once $depth . 'includes/header.php';
 
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-    <!-- ── Entry Form ── -->
+    <!-- â”€â”€ Entry Form â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-edit" style="color:var(--danger);margin-right:8px"></i>
@@ -262,7 +262,7 @@ require_once $depth . 'includes/header.php';
                         <?php foreach ($employees as $e): ?>
                         <option value="<?= htmlspecialchars($e['emp_id']) ?>"
                             <?= $selected_emp_id === $e['emp_id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($e['emp_id']) ?> — <?= htmlspecialchars($e['full_name']) ?>
+                            <?= htmlspecialchars($e['emp_id']) ?> â€” <?= htmlspecialchars($e['full_name']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -278,7 +278,7 @@ require_once $depth . 'includes/header.php';
                         <p style="font-size:0.72rem;color:var(--gray-400);margin:0;text-transform:uppercase;">Employee</p>
                         <p style="font-weight:700;margin:0;"><?= htmlspecialchars($sel_emp['full_name']) ?></p>
                         <p style="font-size:0.8rem;color:var(--gray-600);margin:0;">
-                            <?= htmlspecialchars($sel_emp['position']) ?> — <?= htmlspecialchars($sel_emp['dept_name']) ?>
+                            <?= htmlspecialchars($sel_emp['position']) ?> â€” <?= htmlspecialchars($sel_emp['dept_name']) ?>
                         </p>
                     </div>
                     <div style="text-align:right;">
@@ -289,11 +289,11 @@ require_once $depth . 'includes/header.php';
                     </div>
                 </div>
 
-                <!-- Deduction fields — matching spreadsheet columns -->
+                <!-- Deduction fields â€” matching spreadsheet columns -->
                 <div style="background:var(--gray-100);border-radius:var(--radius);padding:14px;margin-bottom:16px;">
                     <p style="font-size:0.78rem;font-weight:700;color:var(--gray-600);
                                text-transform:uppercase;margin:0 0 12px;">
-                        Other Deductions — <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?>
+                        Other Deductions â€” <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?>
                     </p>
 
                     <?php
@@ -304,7 +304,7 @@ require_once $depth . 'includes/header.php';
 
                     $ded_fields = [
                         ['credit_association', 'Credit Association (10% of basic)',    'fas fa-handshake',         'var(--info)',     'Default: 10% of basic salary',   $default_credit],
-                        ['renaissance_dam',    'Renaissance Dam — GERD (1% of basic)', 'fas fa-water',             'var(--primary)', 'Default: 1% of basic salary',    $default_gerd],
+                        ['renaissance_dam',    'Renaissance Dam â€” GERD (1% of basic)', 'fas fa-water',             'var(--primary)', 'Default: 1% of basic salary',    $default_gerd],
                         ['loan_repayment',     'Loan Repayment',                       'fas fa-hand-holding-usd',  'var(--warning)', 'Monthly loan installment',       0],
                         ['penalty',            'Penalty / Absence',                    'fas fa-exclamation-triangle','var(--danger)', 'Penalty or absence deduction',  0],
                         ['other',              'Other Deduction',                      'fas fa-minus-circle',      'var(--gray-600)','Any other deduction',            0],
@@ -346,7 +346,7 @@ require_once $depth . 'includes/header.php';
                                 Total Other Deductions
                             </p>
                             <p style="font-size:0.75rem;color:var(--gray-600);margin:2px 0 0;">
-                                (Pension 7% + Income Tax calculated separately during payroll)
+                                (Pension 18% + Income Tax calculated separately during payroll)
                             </p>
                         </div>
                         <?php
@@ -379,7 +379,7 @@ require_once $depth . 'includes/header.php';
                 <?php if ($sel_ded): ?>
                 <p style="text-align:center;font-size:0.78rem;color:var(--success);margin-top:8px;">
                     <i class="fas fa-check-circle"></i>
-                    Record exists for <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?> — will be updated.
+                    Record exists for <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?> â€” will be updated.
                 </p>
                 <?php endif; ?>
 
@@ -394,12 +394,12 @@ require_once $depth . 'includes/header.php';
         </div>
     </div>
 
-    <!-- ── Deduction Summary for selected employee ── -->
+    <!-- â”€â”€ Deduction Summary for selected employee â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-history" style="color:var(--primary);margin-right:8px"></i>
                 <?= $sel_emp
-                    ? htmlspecialchars($sel_emp['full_name']) . ' — History'
+                    ? htmlspecialchars($sel_emp['full_name']) . ' â€” History'
                     : 'Deduction History' ?>
             </h3>
         </div>
@@ -478,12 +478,12 @@ require_once $depth . 'includes/header.php';
 
 </div>
 
-<!-- ── Monthly Overview Table (matches spreadsheet layout) ── -->
+<!-- â”€â”€ Monthly Overview Table (matches spreadsheet layout) â”€â”€ -->
 <div class="card">
     <div class="card-header">
         <h3>
             <i class="fas fa-table" style="color:var(--primary);margin-right:8px"></i>
-            All Employees — Deductions for
+            All Employees â€” Deductions for
             <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?>
         </h3>
         <!-- Period switcher -->
@@ -534,32 +534,32 @@ require_once $depth . 'includes/header.php';
                         <td style="color:var(--info);">
                             <?= $row['credit_association'] > 0
                                 ? number_format($row['credit_association'], 2)
-                                : '<span class="text-muted">—</span>' ?>
+                                : '<span class="text-muted">â€”</span>' ?>
                         </td>
                         <td style="color:var(--primary);">
                             <?= $row['renaissance_dam'] > 0
                                 ? number_format($row['renaissance_dam'], 2)
-                                : '<span class="text-muted">—</span>' ?>
+                                : '<span class="text-muted">â€”</span>' ?>
                         </td>
                         <td style="color:var(--warning);">
                             <?= $row['loan_repayment'] > 0
                                 ? number_format($row['loan_repayment'], 2)
-                                : '<span class="text-muted">—</span>' ?>
+                                : '<span class="text-muted">â€”</span>' ?>
                         </td>
                         <td style="color:var(--danger);">
                             <?= $row['penalty'] > 0
                                 ? number_format($row['penalty'], 2)
-                                : '<span class="text-muted">—</span>' ?>
+                                : '<span class="text-muted">â€”</span>' ?>
                         </td>
                         <td>
                             <?= $row['other'] > 0
                                 ? number_format($row['other'], 2)
-                                : '<span class="text-muted">—</span>' ?>
+                                : '<span class="text-muted">â€”</span>' ?>
                         </td>
                         <td style="font-weight:700;color:var(--danger);">
                             <?= $row['total_other_deductions'] > 0
                                 ? 'ETB ' . number_format($row['total_other_deductions'], 2)
-                                : '<span class="text-muted">—</span>' ?>
+                                : '<span class="text-muted">â€”</span>' ?>
                         </td>
                         <td>
                             <a href="deductions.php?emp=<?= urlencode($row['emp_id']) ?>&month=<?= $f_month ?>&year=<?= $f_year ?>"
@@ -627,3 +627,4 @@ document.querySelectorAll('.ded-input').forEach(i => i.addEventListener('input',
 </script>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
+

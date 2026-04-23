@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 $page_title = 'Verify Payroll';
 $active_nav = 'verify';
@@ -10,7 +10,7 @@ $pdo     = getDB();
 $success = '';
 $error   = '';
 
-// ── Load processed periods ─────────────────────────────────
+// â”€â”€ Load processed periods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $periods = $pdo->query("
     SELECT pp.period_id, pp.period_label, pp.period_month, pp.period_year,
            pp.status, pp.processed_at,
@@ -26,7 +26,7 @@ $periods = $pdo->query("
     ORDER  BY pp.period_year DESC, pp.period_month DESC
 ")->fetchAll();
 
-// ── Selected period ────────────────────────────────────────
+// â”€â”€ Selected period â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $sel_period_id = (int)($_GET['period_id'] ?? ($_POST['period_id'] ?? 0));
 $sel_period    = null;
 $records       = [];
@@ -52,7 +52,7 @@ if ($sel_period_id) {
     }
 }
 
-// ── HANDLE APPROVE ─────────────────────────────────────────
+// â”€â”€ HANDLE APPROVE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
     $pid = (int)($_POST['period_id'] ?? 0);
     if ($pid) {
@@ -83,13 +83,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
 
             // Notify admin
             notify_role($pdo, 'admin',
-                'Payroll Verified — ' . $plabel,
+                'Payroll Verified â€” ' . $plabel,
                 "Finance has verified and approved payroll for {$plabel}. Payslips can now be generated.",
                 'success');
 
             // Notify HR
             notify_role($pdo, 'hr',
-                'Payroll Verified — ' . $plabel,
+                'Payroll Verified â€” ' . $plabel,
                 "Payroll for {$plabel} has been verified. Payslips will be generated shortly.",
                 'success');
 
@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
     }
 }
 
-// ── HANDLE REJECT ──────────────────────────────────────────
+// â”€â”€ HANDLE REJECT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reject'])) {
     $pid    = (int)($_POST['period_id'] ?? 0);
     $reason = trim($_POST['reject_reason'] ?? '');
@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reject'])) {
     }
 }
 
-// ── Grand totals ───────────────────────────────────────────
+// â”€â”€ Grand totals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $gt = [];
 if (!empty($records)) {
     $gt = [
@@ -184,7 +184,7 @@ require_once $depth . 'includes/header.php';
 
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-    <!-- ── Processed Periods List ── -->
+    <!-- â”€â”€ Processed Periods List â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-list" style="color:var(--primary);margin-right:8px"></i>
@@ -239,11 +239,11 @@ require_once $depth . 'includes/header.php';
         </div>
     </div>
 
-    <!-- ── Period Summary ── -->
+    <!-- â”€â”€ Period Summary â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-chart-pie" style="color:var(--primary);margin-right:8px"></i>
-                <?= $sel_period ? htmlspecialchars($sel_period['period_label']) . ' — Summary' : 'Select a Period' ?>
+                <?= $sel_period ? htmlspecialchars($sel_period['period_label']) . ' â€” Summary' : 'Select a Period' ?>
             </h3>
             <?php if ($sel_period): ?>
             <span class="badge <?= $status_badge[$sel_period['status']] ?? 'badge-gray' ?>">
@@ -258,8 +258,8 @@ require_once $depth . 'includes/header.php';
                 ['Employees Processed', count($records),                    'var(--primary)'],
                 ['Total Gross Earnings', 'ETB ' . number_format($gt['gross'], 2),       'var(--primary)'],
                 ['Total Income Tax',     'ETB ' . number_format($gt['income_tax'], 2),  'var(--danger)'],
-                ['Total Pension (7%)',   'ETB ' . number_format($gt['pension_emp'], 2), 'var(--warning)'],
-                ['Total Pension (11%)',  'ETB ' . number_format($gt['pension_org'], 2), 'var(--info)'],
+                ['Total Pension (18%)',   'ETB ' . number_format($gt['pension_emp'], 2), 'var(--warning)'],
+                ['Total Pension (18%)',  'ETB ' . number_format($gt['pension_org'], 2), 'var(--info)'],
                 ['Other Deductions',     'ETB ' . number_format($gt['other_deductions'], 2), 'var(--gray-600)'],
                 ['Total Net Pay',        'ETB ' . number_format($gt['net_pay'], 2),     'var(--success)'],
             ];
@@ -288,7 +288,7 @@ require_once $depth . 'includes/header.php';
                     </div>
                     <button type="submit" name="reject" class="btn btn-danger w-100"
                             onclick="return confirm('Reject and send back for re-processing?')">
-                        <i class="fas fa-times"></i> Reject — Send Back
+                        <i class="fas fa-times"></i> Reject â€” Send Back
                     </button>
                 </form>
             </div>
@@ -312,12 +312,12 @@ require_once $depth . 'includes/header.php';
 
 </div>
 
-<!-- ── Detailed Records Table ── -->
+<!-- â”€â”€ Detailed Records Table â”€â”€ -->
 <?php if ($sel_period && !empty($records)): ?>
 <div class="card">
     <div class="card-header">
         <h3><i class="fas fa-table" style="color:var(--primary);margin-right:8px"></i>
-            Payroll Detail — <?= htmlspecialchars($sel_period['period_label']) ?>
+            Payroll Detail â€” <?= htmlspecialchars($sel_period['period_label']) ?>
         </h3>
         <button class="btn btn-secondary btn-sm" onclick="window.print()">
             <i class="fas fa-print"></i> Print
@@ -334,7 +334,7 @@ require_once $depth . 'includes/header.php';
                         <th>Basic (ETB)</th>
                         <th>Gross (ETB)</th>
                         <th>Tax (ETB)</th>
-                        <th>Pension 7% (ETB)</th>
+                        <th>Pension 18% (ETB)</th>
                         <th>Other Ded. (ETB)</th>
                         <th>Net Pay (ETB)</th>
                         <th>Bracket</th>
@@ -357,7 +357,7 @@ require_once $depth . 'includes/header.php';
                         <td class="text-bold" style="color:var(--success);font-size:1rem;"><?= number_format($r['net_pay'], 2) ?></td>
                         <td>
                             <span class="badge <?= $r['tax_bracket'] === '0%' ? 'badge-success' : 'badge-warning' ?>">
-                                <?= htmlspecialchars($r['tax_bracket'] ?? '—') ?>
+                                <?= htmlspecialchars($r['tax_bracket'] ?? 'â€”') ?>
                             </span>
                         </td>
                     </tr>
@@ -381,3 +381,4 @@ require_once $depth . 'includes/header.php';
 <?php endif; ?>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
+

@@ -62,11 +62,11 @@ function getTaxBracket(float $gross): string {
 }
 
 /**
- * Employee Pension = 7% of Basic Salary
- * Employer Pension = 11% of Basic Salary
+ * Employee Pension = 11% of Basic Salary  (updated rule)
+ * Employer Pension = 18% of Basic Salary  (updated rule)
  */
-function calcPensionEmployee(float $basic): float { return round($basic * 0.07, 2); }
-function calcPensionEmployer(float $basic): float { return round($basic * 0.11, 2); }
+function calcPensionEmployee(float $basic): float { return round($basic * 0.11, 2); }
+function calcPensionEmployer(float $basic): float { return round($basic * 0.18, 2); }
 
 // ============================================================
 // GENERATE DYNAMIC PERIOD OPTIONS (last 12 months)
@@ -508,11 +508,11 @@ require_once $depth . 'includes/header.php';
                     2025 Brackets on Gross
                 </div>
                 <div style="padding:8px 12px;background:var(--white);border-radius:6px;border-left:3px solid var(--warning);">
-                    <strong style="color:var(--warning);">Pension (Emp)</strong><br>
+                    <strong style="color:var(--warning);">Pension (Emp 11%)</strong><br>
                     7% × Basic Salary
                 </div>
                 <div style="padding:8px 12px;background:var(--white);border-radius:6px;border-left:3px solid var(--info);">
-                    <strong style="color:var(--info);">Pension (Org)</strong><br>
+                    <strong style="color:var(--info);">Pension (Org 18%)</strong><br>
                     11% × Basic Salary
                 </div>
                 <div style="padding:8px 12px;background:var(--white);border-radius:6px;border-left:3px solid var(--info);">
@@ -644,7 +644,7 @@ require_once $depth . 'includes/header.php';
                     </tr>
                     <tr>
                         <th style="background:var(--danger-light);color:var(--danger);">Income Tax</th>
-                        <th style="background:var(--warning-light);color:var(--warning);">Pension 7%</th>
+                        <th style="background:var(--warning-light);color:var(--warning);">Pension 18%</th>
                         <th style="background:var(--info-light);color:var(--info);">Credit Assoc.
                             <br><span style="font-weight:400;font-size:0.65rem;">(10% default)</span>
                         </th>
@@ -738,8 +738,8 @@ require_once $depth . 'includes/header.php';
             $summary_cards = [
                 ['Total Gross',          $gt['gross'],            'var(--success)'],
                 ['Total Income Tax',     $gt['income_tax'],       'var(--danger)'],
-                ['Total Pension (7%)',   $gt['pension_emp'],      'var(--warning)'],
-                ['Total Pension (11%)',  $gt['pension_org'],      'var(--info)'],
+                ['Total Pension (18%)',   $gt['pension_emp'],      'var(--warning)'],
+                ['Total Pension (18%)',  $gt['pension_org'],      'var(--info)'],
                 ['Credit Association',   $gt['credit_assoc'],     'var(--info)'],
                 ['Renaissance Dam',      $gt['gerd'],             'var(--primary)'],
                 ['Total Deductions',     $gt['total_deductions'], 'var(--danger)'],
@@ -760,8 +760,8 @@ require_once $depth . 'includes/header.php';
             <i class="fas fa-gavel"></i>
             <span>
                 Income tax per <strong>Revised Monthly Employment Tax Brackets — Ethiopia 2025</strong>.
-                Pension: Employee <strong>7%</strong> + Employer <strong>11%</strong> of basic salary.
-                Net Pay = Gross − Income Tax − Pension (7%) − Other Deductions.
+                Pension: Employee <strong>11%</strong> + Employer <strong>18%</strong> of basic salary.
+                Net Pay = Gross − Income Tax − Pension (18%) − Other Deductions.
             </span>
         </div>
     </div>
@@ -783,7 +783,7 @@ require_once $depth . 'includes/header.php';
                         <th>#</th>
                         <th>Employee</th>
                         <th>Basic Salary (ETB)</th>
-                        <th>Employer Pension 11% (ETB)</th>
+                        <th>Employer Pension 18% (ETB)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -827,3 +827,4 @@ window.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
+

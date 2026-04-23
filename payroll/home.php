@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BiT Payroll Management System — Bahir Dar Institute of Technology</title>
+    <title>BiT Payroll Management System â€” Bahir Dar Institute of Technology</title>
     <link rel="stylesheet" href="assets/css/home.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
@@ -61,7 +61,7 @@
             <p class="hero-desc">
                 A secure, automated web-based solution for managing employee salaries,
                 allowances, Ethiopian tax calculations, pension contributions, and
-                digital payslip generation — all in one place.
+                digital payslip generation â€” all in one place.
             </p>
             <div class="hero-actions">
                 <a href="pages/auth/login.php" class="btn-hero-primary">
@@ -271,7 +271,7 @@
                 ['fas fa-percent',           '#2E7D32', 'Ethiopian Tax Compliance',
                  'Applies Ethiopian income tax brackets (Proclamation 1395/2025) accurately for every employee.'],
                 ['fas fa-piggy-bank',        '#E65100', 'Pension Management',
-                 'Calculates 7% employee pension and 11% employer pension contributions automatically.'],
+                 'Calculates 11% employee pension and 18% employer pension contributions automatically.'],
                 ['fas fa-file-invoice-dollar','#6A1B9A','Digital Payslip Generation',
                  'Generates electronic payslips that employees can view and download as PDF anytime.'],
                 ['fas fa-shield-alt',        '#C62828', 'Role-Based Security',
@@ -316,7 +316,7 @@
                 <div class="step-num">2</div>
                 <div class="step-icon"><i class="fas fa-play-circle"></i></div>
                 <h4>Finance Processes Payroll</h4>
-                <p>Finance officer runs monthly payroll — system auto-calculates tax and pension.</p>
+                <p>Finance officer runs monthly payroll â€” system auto-calculates tax and pension.</p>
             </div>
             <div class="step-arrow"><i class="fas fa-chevron-right"></i></div>
             <div class="step-card">
@@ -380,7 +380,7 @@
                     <div class="contact-info-icon"><i class="fas fa-clock"></i></div>
                     <div>
                         <h4>Office Hours</h4>
-                        <p>Monday – Friday: 8:00 AM – 5:00 PM<br>Saturday: 8:00 AM – 12:00 PM</p>
+                        <p>Monday â€“ Friday: 8:00 AM â€“ 5:00 PM<br>Saturday: 8:00 AM â€“ 12:00 PM</p>
                     </div>
                 </div>
             </div>
@@ -439,7 +439,7 @@
                 </div>
                 <p class="footer-desc">
                     A secure, automated web-based payroll management system designed
-                    for BiT staff — ensuring accurate, transparent, and timely salary processing.
+                    for BiT staff â€” ensuring accurate, transparent, and timely salary processing.
                 </p>
             </div>
 
@@ -481,7 +481,7 @@
         </div>
 
         <div class="footer-bottom">
-            <p>&copy; <?= date('Y') ?> Bahir Dar Institute of Technology — BiT Payroll Management System. All rights reserved.</p>
+            <p>&copy; <?= date('Y') ?> Bahir Dar Institute of Technology â€” BiT Payroll Management System. All rights reserved.</p>
             <p style="font-size:0.78rem;opacity:0.6;margin-top:4px;">
                 Developed by: Efream Enawgaw &bull; Abebe Guadie &bull; Chalachew Assefa &nbsp;|&nbsp; Advisor: Tiruedel A
             </p>
@@ -573,3 +573,4 @@ document.querySelectorAll('.about-card, .feature-card, .role-card, .step-card').
 </script>
 </body>
 </html>
+

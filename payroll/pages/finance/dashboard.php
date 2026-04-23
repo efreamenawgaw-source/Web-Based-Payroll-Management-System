@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 $page_title = 'Finance Dashboard';
 $active_nav = 'dashboard';
@@ -8,12 +8,12 @@ require_once $depth . 'includes/header.php';
 
 $pdo = getDB();
 
-// ── Current month / year ───────────────────────────────────
+// â”€â”€ Current month / year â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $cur_month = (int)date('n');
 $cur_year  = (int)date('Y');
 $cur_label = date('F Y');
 
-// ── Latest processed period ────────────────────────────────
+// â”€â”€ Latest processed period â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $latest_period = $pdo->query("
     SELECT pp.*,
            SUM(pr.gross_salary)     AS total_gross,
@@ -31,7 +31,7 @@ $latest_period = $pdo->query("
     LIMIT  1
 ")->fetch();
 
-// ── Payroll period status counts ───────────────────────────
+// â”€â”€ Payroll period status counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $period_stats = $pdo->query("
     SELECT
         SUM(CASE WHEN status = 'processed'  THEN 1 ELSE 0 END) AS `processed`,
@@ -42,12 +42,12 @@ $period_stats = $pdo->query("
     FROM payroll_periods
 ")->fetch();
 
-// ── Active employees count ─────────────────────────────────
+// â”€â”€ Active employees count â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $active_emp = (int)$pdo->query("
     SELECT COUNT(*) FROM employees WHERE status = 'active'
 ")->fetchColumn();
 
-// ── Working days submitted for current month ───────────────
+// â”€â”€ Working days submitted for current month â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $wd_submitted = (int)$pdo->prepare("
     SELECT COUNT(*) FROM working_days
     WHERE period_month = ? AND period_year = ?
@@ -64,10 +64,10 @@ $wds = $pdo->prepare("SELECT COUNT(*) FROM working_days WHERE period_month=? AND
 $wds->execute([$cur_month, $cur_year]);
 $wd_submitted = (int)$wds->fetchColumn();
 
-// ── Payslips generated total ───────────────────────────────
+// â”€â”€ Payslips generated total â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $total_payslips = (int)$pdo->query("SELECT COUNT(*) FROM payslips")->fetchColumn();
 
-// ── Recent payroll records (last 8) ───────────────────────
+// â”€â”€ Recent payroll records (last 8) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $recent_records = $pdo->query("
     SELECT pr.record_id, pr.emp_id, pr.gross_salary,
            pr.income_tax, pr.net_pay,
@@ -80,7 +80,7 @@ $recent_records = $pdo->query("
     LIMIT  8
 ")->fetchAll();
 
-// ── All periods list ───────────────────────────────────────
+// â”€â”€ All periods list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $all_periods = $pdo->query("
     SELECT pp.period_id, pp.period_label, pp.status,
            COUNT(pr.record_id)  AS emp_count,
@@ -95,7 +95,7 @@ $all_periods = $pdo->query("
     LIMIT  6
 ")->fetchAll();
 
-// ── Annual totals (current year) ───────────────────────────
+// â”€â”€ Annual totals (current year) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $annual = $pdo->query("
     SELECT
         SUM(pr.gross_salary)     AS total_gross,
@@ -128,7 +128,7 @@ $status_badge = [
     <p>Process payroll, verify calculations, and generate financial reports.</p>
 </div>
 
-<!-- ── Stats ── -->
+<!-- â”€â”€ Stats â”€â”€ -->
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-icon blue"><i class="fas fa-money-bill-wave"></i></div>
@@ -137,7 +137,7 @@ $status_badge = [
             <h2>
                 <?= $latest_period
                     ? 'ETB ' . number_format($latest_period['total_net'], 0)
-                    : '—' ?>
+                    : 'â€”' ?>
             </h2>
             <span class="stat-change up">
                 <?= $latest_period ? htmlspecialchars($latest_period['period_label']) : 'No data yet' ?>
@@ -177,13 +177,13 @@ $status_badge = [
 
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-    <!-- ── Latest Period Summary ── -->
+    <!-- â”€â”€ Latest Period Summary â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3>
                 <i class="fas fa-chart-pie" style="color:var(--primary);margin-right:8px"></i>
                 <?= $latest_period
-                    ? htmlspecialchars($latest_period['period_label']) . ' — Summary'
+                    ? htmlspecialchars($latest_period['period_label']) . ' â€” Summary'
                     : 'No Payroll Processed Yet' ?>
             </h3>
             <?php if ($latest_period): ?>
@@ -199,8 +199,8 @@ $status_badge = [
                 ['Employees Processed',   $latest_period['emp_count'],                                    'var(--primary)'],
                 ['Total Gross Earnings',  'ETB ' . number_format($latest_period['total_gross'], 2),       'var(--primary)'],
                 ['Total Income Tax',      'ETB ' . number_format($latest_period['total_tax'], 2),         'var(--danger)'],
-                ['Employee Pension (7%)', 'ETB ' . number_format($latest_period['total_pension_emp'], 2), 'var(--warning)'],
-                ['Employer Pension (11%)','ETB ' . number_format($latest_period['total_pension_org'], 2), 'var(--info)'],
+                ['Employee 11%)', 'ETB ' . number_format($latest_period['total_pension_emp'], 2), 'var(--warning)'],
+                ['Employer 18%)','ETB ' . number_format($latest_period['total_pension_org'], 2), 'var(--info)'],
                 ['Other Deductions',      'ETB ' . number_format($latest_period['total_other_ded'], 2),   'var(--gray-600)'],
                 ['Total Net Pay',         'ETB ' . number_format($latest_period['total_net'], 2),         'var(--success)'],
             ];
@@ -242,7 +242,7 @@ $status_badge = [
         </div>
     </div>
 
-    <!-- ── Quick Actions + Current Month Status ── -->
+    <!-- â”€â”€ Quick Actions + Current Month Status â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-bolt" style="color:var(--primary);margin-right:8px"></i>
@@ -274,7 +274,7 @@ $status_badge = [
             <div style="background:var(--bg-light);border-radius:var(--radius);padding:14px;">
                 <h4 style="font-size:0.82rem;color:var(--primary);margin-bottom:10px;">
                     <i class="fas fa-calendar-check"></i>
-                    <?= $cur_label ?> — Readiness
+                    <?= $cur_label ?> â€” Readiness
                 </h4>
                 <?php
                 $readiness = [
@@ -302,11 +302,11 @@ $status_badge = [
 
                 <!-- Tax rules reminder -->
                 <div style="margin-top:12px;font-size:0.78rem;color:var(--gray-600);line-height:1.8;">
-                    <div>• Employee Pension: <strong>7%</strong> of basic salary</div>
-                    <div>• Employer Pension: <strong>11%</strong> of basic salary</div>
-                    <div>• Credit Association: <strong>10%</strong> of basic salary</div>
-                    <div>• Renaissance Dam: <strong>1%</strong> of basic salary</div>
-                    <div>• Income Tax: <strong>2025 Brackets</strong> on gross earnings</div>
+                    <div>â€¢ Employee 11%</strong> of basic salary</div>
+                    <div>â€¢ Employer 18%</strong> of basic salary</div>
+                    <div>â€¢ Credit Association: <strong>10%</strong> of basic salary</div>
+                    <div>â€¢ Renaissance Dam: <strong>1%</strong> of basic salary</div>
+                    <div>â€¢ Income Tax: <strong>2025 Brackets</strong> on gross earnings</div>
                 </div>
             </div>
         </div>
@@ -314,7 +314,7 @@ $status_badge = [
 
 </div>
 
-<!-- ── Recent Payroll Records ── -->
+<!-- â”€â”€ Recent Payroll Records â”€â”€ -->
 <div class="card mb-3">
     <div class="card-header">
         <h3>
@@ -378,7 +378,7 @@ $status_badge = [
     </div>
 </div>
 
-<!-- ── Payroll Periods Overview ── -->
+<!-- â”€â”€ Payroll Periods Overview â”€â”€ -->
 <div class="grid-2" style="gap:24px;">
 
     <!-- Periods Table -->
@@ -414,7 +414,7 @@ $status_badge = [
                             <td><strong><?= htmlspecialchars($p['period_label']) ?></strong></td>
                             <td><?= $p['emp_count'] ?></td>
                             <td class="text-success text-bold">
-                                <?= $p['total_net'] ? number_format($p['total_net'], 2) : '—' ?>
+                                <?= $p['total_net'] ? number_format($p['total_net'], 2) : 'â€”' ?>
                             </td>
                             <td>
                                 <?php if ($p['payslips_count'] > 0): ?>
@@ -454,8 +454,8 @@ $status_badge = [
             $annual_rows = [
                 ['Total Gross Paid',      'ETB ' . number_format($annual['total_gross'], 2),       'var(--primary)'],
                 ['Total Income Tax',      'ETB ' . number_format($annual['total_tax'], 2),         'var(--danger)'],
-                ['Employee Pension (7%)', 'ETB ' . number_format($annual['total_pension_emp'], 2), 'var(--warning)'],
-                ['Employer Pension (11%)','ETB ' . number_format($annual['total_pension_org'], 2), 'var(--info)'],
+                ['Employee 11%)', 'ETB ' . number_format($annual['total_pension_emp'], 2), 'var(--warning)'],
+                ['Employer 18%)','ETB ' . number_format($annual['total_pension_org'], 2), 'var(--info)'],
                 ['Total Net Disbursed',   'ETB ' . number_format($annual['total_net'], 2),         'var(--success)'],
             ];
             foreach ($annual_rows as $ar): ?>
@@ -484,3 +484,4 @@ $status_badge = [
 </div>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
+

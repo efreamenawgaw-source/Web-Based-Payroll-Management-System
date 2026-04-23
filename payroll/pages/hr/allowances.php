@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 $page_title = 'Manage Allowances';
 $active_nav = 'allowances';
@@ -9,10 +9,10 @@ $pdo     = getDB();
 $success = '';
 $error   = '';
 
-// ── Pre-select employee from query string ──────────────────
+// â”€â”€ Pre-select employee from query string â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $selected_emp_id = trim($_GET['emp'] ?? '');
 
-// ── Handle SAVE ────────────────────────────────────────────
+// â”€â”€ Handle SAVE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_allowances'])) {
     $emp_id         = trim($_POST['emp_id']            ?? '');
     $housing        = (float)($_POST['housing']        ?? 0);
@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_allowances'])) {
     }
 }
 
-// ── Load all active employees ──────────────────────────────
+// â”€â”€ Load all active employees â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $employees = $pdo->query("
     SELECT e.emp_id, e.full_name, e.basic_salary, d.dept_name
     FROM   employees e
@@ -72,7 +72,7 @@ $employees = $pdo->query("
     ORDER  BY e.full_name
 ")->fetchAll();
 
-// ── Load selected employee's current allowances ────────────
+// â”€â”€ Load selected employee's current allowances â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $current = null;
 $sel_emp = null;
 if ($selected_emp_id) {
@@ -94,7 +94,7 @@ if ($selected_emp_id) {
     $current = $cur_stmt->fetch();
 }
 
-// ── All employees allowances overview ─────────────────────
+// â”€â”€ All employees allowances overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $overview = $pdo->query("
     SELECT e.emp_id, e.full_name, e.basic_salary,
            COALESCE(a.housing, 0)            AS housing,
@@ -132,7 +132,7 @@ require_once $depth . 'includes/header.php';
 
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-    <!-- ── Update Form ── -->
+    <!-- â”€â”€ Update Form â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-hand-holding-usd" style="color:var(--success);margin-right:8px"></i>
@@ -151,7 +151,7 @@ require_once $depth . 'includes/header.php';
                         <?php foreach ($employees as $e): ?>
                         <option value="<?= htmlspecialchars($e['emp_id']) ?>"
                             <?= $selected_emp_id === $e['emp_id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($e['emp_id']) ?> — <?= htmlspecialchars($e['full_name']) ?>
+                            <?= htmlspecialchars($e['emp_id']) ?> â€” <?= htmlspecialchars($e['full_name']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -165,7 +165,7 @@ require_once $depth . 'includes/header.php';
                             <p style="font-size:0.72rem;color:var(--gray-400);margin:0;text-transform:uppercase;">Employee</p>
                             <p style="font-weight:700;margin:0;"><?= htmlspecialchars($sel_emp['full_name']) ?></p>
                             <p style="font-size:0.8rem;color:var(--gray-600);margin:0;">
-                                <?= htmlspecialchars($sel_emp['position']) ?> — <?= htmlspecialchars($sel_emp['dept_name']) ?>
+                                <?= htmlspecialchars($sel_emp['position']) ?> â€” <?= htmlspecialchars($sel_emp['dept_name']) ?>
                             </p>
                         </div>
                         <div style="text-align:right;">
@@ -243,7 +243,7 @@ require_once $depth . 'includes/header.php';
         </div>
     </div>
 
-    <!-- ── Overview Table ── -->
+    <!-- â”€â”€ Overview Table â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-list" style="color:var(--primary);margin-right:8px"></i>
@@ -295,8 +295,8 @@ require_once $depth . 'includes/header.php';
         <div class="card-footer">
             <div class="alert alert-info" style="margin:0;font-size:0.82rem;">
                 <i class="fas fa-info-circle"></i>
-                Pension (7%) is on <strong>basic salary only</strong>.
-                Tax is on <strong>Gross − Pension</strong>.
+                Pension (18%) is on <strong>basic salary only</strong>.
+                Tax is on <strong>Gross âˆ’ Pension</strong>.
             </div>
         </div>
     </div>
@@ -322,3 +322,4 @@ document.querySelectorAll('.allow-input').forEach(i => i.addEventListener('input
 <?php endif; ?>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
+

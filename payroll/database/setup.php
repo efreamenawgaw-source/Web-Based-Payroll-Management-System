@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 // ============================================================
-// BiT Payroll — Database Setup Script
+// BiT Payroll â€” Database Setup Script
 // Run once: http://localhost/payroll/database/setup.php
 // ============================================================
 
@@ -28,11 +28,11 @@ try {
     // Step 2: Drop and recreate the database
     $pdo->exec("DROP DATABASE IF EXISTS payroll_db");
     $pdo->exec("CREATE DATABASE payroll_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    $messages[] = '✅ Database payroll_db created.';
+    $messages[] = 'âœ… Database payroll_db created.';
 
     // Step 3: Select the database
     $pdo->exec("USE payroll_db");
-    $messages[] = '✅ Using payroll_db.';
+    $messages[] = 'âœ… Using payroll_db.';
 
     // Step 4: Create all tables one by one
     $tables = [];
@@ -290,13 +290,28 @@ try {
             CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
+    $tables['password_resets'] = "
+        CREATE TABLE password_resets (
+            reset_id   INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id    INT UNSIGNED NOT NULL,
+            token      VARCHAR(64)  NOT NULL UNIQUE,
+            expires_at DATETIME     NOT NULL,
+            used       TINYINT(1)   NOT NULL DEFAULT 0,
+            created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (reset_id),
+            INDEX idx_reset_token   (token),
+            INDEX idx_reset_user    (user_id),
+            INDEX idx_reset_expires (expires_at),
+            CONSTRAINT fk_reset_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
     // Execute each table
     foreach ($tables as $name => $sql) {
         try {
             $pdo->exec($sql);
-            $messages[] = "✅ Table <strong>{$name}</strong> created.";
+            $messages[] = "âœ… Table <strong>{$name}</strong> created.";
         } catch (PDOException $e) {
-            $errors[] = "❌ Table {$name}: " . $e->getMessage();
+            $errors[] = "âŒ Table {$name}: " . $e->getMessage();
         }
     }
 
@@ -311,12 +326,12 @@ try {
         ('Human Resources Office', 'HRO'),
         ('Library',                'LIB'),
         ('IT Support',             'ITS')");
-    $messages[] = '✅ Departments seeded.';
+    $messages[] = 'âœ… Departments seeded.';
 
     // System settings
     $pdo->exec("INSERT INTO system_settings (setting_key, setting_value, description) VALUES
-        ('pension_employee_rate',   '0.07',  'Employee pension rate (7%)'),
-        ('pension_employer_rate',   '0.11',  'Employer pension rate (11%)'),
+        ('pension_Employee 11%)'),
+        ('pension_Employer 18%)'),
         ('credit_association_rate', '0.10',  'Credit Association rate (10%)'),
         ('renaissance_dam_rate',    '0.01',  'Renaissance Dam rate (1%)'),
         ('tax_year',                '2025',  'Active tax bracket year'),
@@ -325,13 +340,13 @@ try {
         ('currency',                'ETB',   'Currency code'),
         ('payroll_day',             '28',    'Default payroll day'),
         ('session_timeout_minutes', '15',    'Session timeout in minutes')");
-    $messages[] = '✅ System settings seeded.';
+    $messages[] = 'âœ… System settings seeded.';
 
-    // Admin user — password: Admin@2025
+    // Admin user â€” password: Admin@2025
     $hash = password_hash('Admin@2025', PASSWORD_BCRYPT, ['cost' => 12]);
     $stmt = $pdo->prepare("INSERT INTO users (username, password, role, full_name, email) VALUES (?, ?, 'admin', 'System Administrator', 'admin@bit.edu.et')");
     $stmt->execute(['admin', $hash]);
-    $messages[] = '✅ Admin user created.';
+    $messages[] = 'âœ… Admin user created.';
 
 } catch (PDOException $e) {
     $errors[] = 'Fatal: ' . $e->getMessage();
@@ -342,7 +357,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BiT Payroll — Database Setup</title>
+    <title>BiT Payroll â€” Database Setup</title>
     <style>
         * { box-sizing:border-box; margin:0; padding:0; }
         body { font-family:'Segoe UI',Arial,sans-serif; background:#E3F2FD;
@@ -374,7 +389,7 @@ try {
 <body>
 <div class="card">
     <div class="logo">BiT</div>
-    <h2>Payroll Management System — Database Setup</h2>
+    <h2>Payroll Management System â€” Database Setup</h2>
 
     <?php foreach ($messages as $msg): ?>
     <div class="ok"><?= $msg ?></div>
@@ -386,16 +401,17 @@ try {
 
     <?php if (empty($errors)): ?>
     <div class="creds">
-        <p><strong>✅ Setup Complete! Login Credentials:</strong></p>
+        <p><strong>âœ… Setup Complete! Login Credentials:</strong></p>
         <p>Username: <code>admin</code></p>
         <p>Password: <code>Admin@2025</code></p>
     </div>
     <div class="warn">
-        ⚠️ <strong>Delete this file after logging in:</strong><br>
+        âš ï¸ <strong>Delete this file after logging in:</strong><br>
         <code>payroll/database/setup.php</code>
     </div>
-    <a href="../auth/login.php" class="btn">→ Go to Login</a>
+    <a href="../auth/login.php" class="btn">â†’ Go to Login</a>
     <?php endif; ?>
 </div>
 </body>
 </html>
+

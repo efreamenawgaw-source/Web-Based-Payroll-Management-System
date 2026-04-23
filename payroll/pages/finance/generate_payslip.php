@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 $page_title = 'Generate Payslips';
 $active_nav = 'payslip';
@@ -10,7 +10,7 @@ $pdo     = getDB();
 $success = '';
 $error   = '';
 
-// ── Load verified periods ──────────────────────────────────
+// â”€â”€ Load verified periods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $periods = $pdo->query("
     SELECT pp.period_id, pp.period_label, pp.period_month, pp.period_year,
            pp.status, COUNT(pr.record_id) AS emp_count,
@@ -24,7 +24,7 @@ $periods = $pdo->query("
     ORDER  BY pp.period_year DESC, pp.period_month DESC
 ")->fetchAll();
 
-// ── Selected period ────────────────────────────────────────
+// â”€â”€ Selected period â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $sel_period_id = (int)($_GET['period_id'] ?? ($_POST['period_id'] ?? 0));
 $sel_period    = null;
 $records       = [];
@@ -53,7 +53,7 @@ if ($sel_period_id) {
     }
 }
 
-// ── GENERATE PAYSLIPS ──────────────────────────────────────
+// â”€â”€ GENERATE PAYSLIPS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
     $pid = (int)($_POST['period_id'] ?? 0);
     if ($pid) {
@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
             $emp_users->execute([$pid]);
             foreach ($emp_users->fetchAll() as $eu) {
                 notify($pdo, $eu['user_id'],
-                    'Payslip Available — ' . $plabel,
+                    'Payslip Available â€” ' . $plabel,
                     "Your payslip for {$plabel} is ready. Net Pay: ETB " . number_format($eu['net_pay'], 2) . ". Click to view and download.",
                     'success',
                     '/pages/employee/payslips.php');
@@ -122,11 +122,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
 
             // Notify admin and HR
             notify_role($pdo, 'admin',
-                'Payslips Generated — ' . $plabel,
+                'Payslips Generated â€” ' . $plabel,
                 "{$generated} payslips generated for {$plabel}. Employees have been notified.",
                 'success');
             notify_role($pdo, 'hr',
-                'Payslips Generated — ' . $plabel,
+                'Payslips Generated â€” ' . $plabel,
                 "{$generated} payslips are now available for employees for {$plabel}.",
                 'success');
 
@@ -143,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
     }
 }
 
-// ── VIEW SINGLE PAYSLIP ────────────────────────────────────
+// â”€â”€ VIEW SINGLE PAYSLIP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $view_record = null;
 if (!empty($_GET['view'])) {
     $vr = $pdo->prepare("
@@ -213,7 +213,7 @@ require_once $depth . 'includes/header.php';
 
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-    <!-- ── Verified Periods ── -->
+    <!-- â”€â”€ Verified Periods â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-list" style="color:var(--primary);margin-right:8px"></i>
@@ -272,7 +272,7 @@ require_once $depth . 'includes/header.php';
         </div>
     </div>
 
-    <!-- ── Generate Action ── -->
+    <!-- â”€â”€ Generate Action â”€â”€ -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-file-invoice-dollar" style="color:var(--primary);margin-right:8px"></i>
@@ -335,12 +335,12 @@ require_once $depth . 'includes/header.php';
 
 </div>
 
-<!-- ── Payslips List ── -->
+<!-- â”€â”€ Payslips List â”€â”€ -->
 <?php if ($sel_period && !empty($records)): ?>
 <div class="card">
     <div class="card-header">
         <h3><i class="fas fa-file-invoice" style="color:var(--primary);margin-right:8px"></i>
-            Payslips — <?= htmlspecialchars($sel_period['period_label']) ?>
+            Payslips â€” <?= htmlspecialchars($sel_period['period_label']) ?>
         </h3>
         <span class="badge badge-primary"><?= count($records) ?> employees</span>
     </div>
@@ -399,14 +399,14 @@ require_once $depth . 'includes/header.php';
 </div>
 <?php endif; ?>
 
-<!-- ── Payslip Modal ── -->
+<!-- â”€â”€ Payslip Modal â”€â”€ -->
 <?php if ($view_record): ?>
 <div class="modal-overlay active" id="payslipModal">
     <div class="modal" style="max-width:640px;">
         <div class="modal-header">
             <h3>
                 <i class="fas fa-file-invoice-dollar" style="color:var(--primary);margin-right:8px"></i>
-                Payslip — <?= htmlspecialchars($view_record['period_label']) ?>
+                Payslip â€” <?= htmlspecialchars($view_record['period_label']) ?>
             </h3>
             <a href="generate_payslip.php?period_id=<?= $sel_period_id ?>"
                class="modal-close" style="text-decoration:none;">&times;</a>
@@ -418,7 +418,7 @@ require_once $depth . 'includes/header.php';
                 <div style="font-size:1.6rem;font-weight:900;color:var(--white);letter-spacing:-1px;">BiT</div>
                 <div style="font-weight:700;font-size:1rem;color:var(--white);">Bahir Dar Institute of Technology</div>
                 <div style="font-size:0.82rem;color:rgba(255,255,255,0.80);">
-                    PAYSLIP — <?= strtoupper(htmlspecialchars($view_record['period_label'])) ?>
+                    PAYSLIP â€” <?= strtoupper(htmlspecialchars($view_record['period_label'])) ?>
                 </div>
             </div>
 
@@ -496,7 +496,7 @@ require_once $depth . 'includes/header.php';
                     <td style="padding:8px 12px;text-align:right;color:var(--danger);"><?= number_format($view_record['income_tax'], 2) ?></td>
                 </tr>
                 <tr style="border-bottom:1px solid var(--gray-200);">
-                    <td style="padding:8px 12px;">Employee Pension (7% of basic)</td>
+                    <td style="padding:8px 12px;">Employee 18% of basic)</td>
                     <td style="padding:8px 12px;text-align:right;color:var(--warning);"><?= number_format($view_record['pension_employee'], 2) ?></td>
                 </tr>
                 <?php if ($ded_view && $ded_view['credit_association'] > 0): ?>
@@ -507,7 +507,7 @@ require_once $depth . 'includes/header.php';
                 <?php endif; ?>
                 <?php if ($ded_view && $ded_view['renaissance_dam'] > 0): ?>
                 <tr style="border-bottom:1px solid var(--gray-200);">
-                    <td style="padding:8px 12px;">Renaissance Dam — GERD (1%)</td>
+                    <td style="padding:8px 12px;">Renaissance Dam â€” GERD (1%)</td>
                     <td style="padding:8px 12px;text-align:right;color:var(--info);"><?= number_format($ded_view['renaissance_dam'], 2) ?></td>
                 </tr>
                 <?php endif; ?>
@@ -535,7 +535,7 @@ require_once $depth . 'includes/header.php';
             <div style="margin-top:10px;padding:10px 12px;background:var(--info-light);border-radius:var(--radius);
                         font-size:0.78rem;color:var(--info);text-align:center;">
                 <i class="fas fa-shield-alt"></i>
-                Employer Pension (11% of basic): <strong>ETB <?= number_format($view_record['pension_employer'], 2) ?></strong> — paid by BiT
+                Employer 18% of basic): <strong>ETB <?= number_format($view_record['pension_employer'], 2) ?></strong> â€” paid by BiT
             </div>
             <div style="margin-top:6px;font-size:0.7rem;color:var(--gray-400);text-align:center;">
                 Generated: <?= $view_record['generated_at'] ? date('M d, Y H:i', strtotime($view_record['generated_at'])) : date('M d, Y H:i') ?>
@@ -575,3 +575,4 @@ function printPayslip() {
 </script>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
+
