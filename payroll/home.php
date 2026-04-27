@@ -388,18 +388,23 @@
             <!-- Contact Form -->
             <div class="contact-form-card">
                 <h3>Send a Message</h3>
-                <form class="contact-form" onsubmit="handleContact(event)">
+                <form class="contact-form" id="contactForm" onsubmit="handleContact(event)">
+                    <!-- Honeypot — hidden from humans, catches bots -->
+                    <input type="text" name="website" style="display:none;" tabindex="-1" autocomplete="off">
+
                     <div class="form-group">
                         <label>Full Name</label>
-                        <input type="text" class="form-input" placeholder="Your full name" required>
+                        <input type="text" name="full_name" class="form-input"
+                               placeholder="Your full name" required minlength="2">
                     </div>
                     <div class="form-group">
                         <label>Email Address</label>
-                        <input type="email" class="form-input" placeholder="your@email.com" required>
+                        <input type="email" name="email" class="form-input"
+                               placeholder="your@email.com" required>
                     </div>
                     <div class="form-group">
                         <label>Subject</label>
-                        <select class="form-input">
+                        <select name="subject" class="form-input">
                             <option>General Inquiry</option>
                             <option>Technical Support</option>
                             <option>Payslip Issue</option>
@@ -409,9 +414,14 @@
                     </div>
                     <div class="form-group">
                         <label>Message</label>
-                        <textarea class="form-input" rows="4" placeholder="Your message..." required></textarea>
+                        <textarea name="message" class="form-input" rows="4"
+                                  placeholder="Your message..." required minlength="10"></textarea>
                     </div>
-                    <button type="submit" class="btn-contact-submit">
+                    <div id="contactError" style="display:none;color:#C62828;font-size:0.85rem;
+                         margin-bottom:12px;padding:10px 14px;background:#FFEBEE;
+                         border-radius:8px;border-left:3px solid #C62828;">
+                    </div>
+                    <button type="submit" class="btn-contact-submit" id="contactSubmitBtn">
                         <i class="fas fa-paper-plane"></i> Send Message
                     </button>
                 </form>
@@ -551,11 +561,45 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
-// ---- Contact form ----
-function handleContact(e) {
+// ---- Contact form — real fetch submission ----
+async function handleContact(e) {
     e.preventDefault();
-    document.querySelector('.contact-form').style.display = 'none';
-    document.getElementById('contactSuccess').style.display = 'flex';
+
+    const form      = document.getElementById('contactForm');
+    const btn       = document.getElementById('contactSubmitBtn');
+    const errorBox  = document.getElementById('contactError');
+    const successBox= document.getElementById('contactSuccess');
+
+    // Reset state
+    errorBox.style.display = 'none';
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+    try {
+        const formData = new FormData(form);
+
+        // Determine API path relative to current page location
+        const base = window.location.pathname.replace(/\/[^/]*$/, '');
+        const apiUrl = base + '/api/contact.php';
+
+        const res  = await fetch(apiUrl, { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+            form.style.display   = 'none';
+            successBox.style.display = 'flex';
+        } else {
+            errorBox.textContent    = data.message || 'Something went wrong. Please try again.';
+            errorBox.style.display  = 'block';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
+        }
+    } catch (err) {
+        errorBox.textContent   = 'Network error. Please check your connection and try again.';
+        errorBox.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
+    }
 }
 
 // ---- Animate on scroll (simple) ----

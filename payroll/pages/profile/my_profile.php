@@ -41,7 +41,7 @@ if (!is_dir($uploads_fs)) {
 // ── Load current user ──────────────────────────────────────
 $user_stmt = $pdo->prepare("
     SELECT u.*,
-           e.emp_id, e.full_name AS emp_name, e.gender, e.date_of_birth,
+           e.emp_id, e.full_name AS emp_name, e.last_name, e.gender, e.date_of_birth,
            e.phone AS emp_phone, e.address, e.position, e.employment_type,
            e.basic_salary, e.employment_date, e.status AS emp_status,
            d.dept_name
@@ -105,6 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_photo'])) {
 // ── HANDLE PROFILE INFO UPDATE ─────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     $full_name = trim($_POST['full_name'] ?? '');
+    $last_name = trim($_POST['last_name'] ?? '') ?: null;
     $email     = trim($_POST['email']     ?? '') ?: null;
     $phone     = trim($_POST['phone']     ?? '') ?: null;
     $address   = trim($_POST['address']   ?? '') ?: null;
@@ -121,14 +122,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
             // Update employees table if linked
             if ($user['emp_id']) {
                 $pdo->prepare("
-                    UPDATE employees SET full_name = ?, email = ?, phone = ?, address = ?
+                    UPDATE employees SET full_name = ?, last_name = ?, email = ?, phone = ?, address = ?
                     WHERE emp_id = ?
-                ")->execute([$full_name, $email, $phone, $address, $user['emp_id']]);
+                ")->execute([$full_name, $last_name, $email, $phone, $address, $user['emp_id']]);
             }
 
             // Update session
             $_SESSION['name'] = $full_name;
             $user['full_name'] = $full_name;
+            $user['last_name'] = $last_name;
             $user['email']     = $email;
 
             // Notification
@@ -312,6 +314,13 @@ require_once $depth . 'includes/header.php';
                     <label class="form-label">Full Name <span style="color:var(--danger)">*</span></label>
                     <input type="text" name="full_name" class="form-control"
                            value="<?= htmlspecialchars($user['full_name']) ?>" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Last Name (Father's Name)</label>
+                    <input type="text" name="last_name" class="form-control"
+                           value="<?= htmlspecialchars($user['last_name'] ?? '') ?>"
+                           placeholder="e.g. Simane">
+                    <span class="form-hint">Optional &mdash; 3rd name / family name</span>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Email Address</label>

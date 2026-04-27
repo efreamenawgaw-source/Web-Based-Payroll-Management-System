@@ -37,7 +37,7 @@ if ($sel_period_id) {
     if ($sel_period) {
         $rec_stmt = $pdo->prepare("
             SELECT pr.*,
-                   e.full_name, e.email, e.phone,
+                   e.full_name, e.last_name, e.email, e.phone,
                    e.basic_salary AS emp_basic,
                    d.dept_name, e.position,
                    ps.payslip_id, ps.generated_at
@@ -148,7 +148,7 @@ $view_record = null;
 if (!empty($_GET['view'])) {
     $vr = $pdo->prepare("
         SELECT pr.*,
-               e.full_name, e.email, e.phone, e.position, e.employment_date,
+               e.full_name, e.last_name, e.email, e.phone, e.position, e.employment_date,
                d.dept_name,
                pp.period_label, pp.period_month, pp.period_year,
                ps.generated_at,
@@ -427,7 +427,7 @@ require_once $depth . 'includes/header.php';
                         background:var(--bg-light);padding:14px;border-radius:var(--radius);margin-bottom:16px;">
                 <?php
                 $info_rows = [
-                    ['Employee Name', $view_record['full_name']],
+                    ['Employee Name', $view_record['full_name'] . ($view_record['last_name'] ? ' ' . $view_record['last_name'] : '')],
                     ['Employee ID',   $view_record['emp_id']],
                     ['Department',    $view_record['dept_name']],
                     ['Position',      $view_record['position']],

@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Sanitise inputs
     $emp_id          = strtoupper(trim($post['emp_id']          ?? ''));
     $full_name       = trim($post['full_name']                  ?? '');
+    $last_name       = trim($post['last_name']                  ?? '') ?: null;
     $gender          = trim($post['gender']                     ?? '');
     $dob             = trim($post['dob']                        ?? '') ?: null;
     $email           = trim($post['email']                      ?? '') ?: null;
@@ -68,14 +69,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Insert employee
             $stmt = $pdo->prepare("
                 INSERT INTO employees
-                    (emp_id, full_name, gender, date_of_birth, phone, email,
+                    (emp_id, full_name, last_name, gender, date_of_birth, phone, email,
                      dept_id, position, employment_type, basic_salary,
                      employment_date, status, created_by)
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
-                $emp_id, $full_name, $gender, $dob, $phone, $email,
+                $emp_id, $full_name, $last_name, $gender, $dob, $phone, $email,
                 $dept_id, $position, $emp_type, $basic_salary,
                 $employment_date, $status, $_SESSION['user_id']
             ]);
@@ -176,6 +177,14 @@ require_once $depth . 'includes/header.php';
                 <input type="text" name="full_name" class="form-control"
                        placeholder="e.g. Admasu Dejene"
                        value="<?= htmlspecialchars($post['full_name'] ?? '') ?>" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Last Name (Father's Name)</label>
+                <input type="text" name="last_name" class="form-control"
+                       placeholder="e.g. Simane"
+                       value="<?= htmlspecialchars($post['last_name'] ?? '') ?>">
+                <span class="form-hint">Optional &mdash; 3rd name / family name</span>
             </div>
 
             <div class="form-row">

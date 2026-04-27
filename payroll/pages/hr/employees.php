@@ -19,6 +19,7 @@ $departments = $pdo->query("
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_employee'])) {
     $emp_id       = trim($_POST['emp_id']       ?? '');
     $full_name    = trim($_POST['full_name']     ?? '');
+    $last_name    = trim($_POST['last_name']     ?? '') ?: null;
     $dept_id      = (int)($_POST['dept_id']      ?? 0);
     $position     = trim($_POST['position']      ?? '');
     $basic_salary = (float)($_POST['basic_salary'] ?? 0);
@@ -30,13 +31,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_employee'])) {
         try {
             $stmt = $pdo->prepare("
                 UPDATE employees
-                SET    full_name = ?, dept_id = ?, position = ?,
+                SET    full_name = ?, last_name = ?, dept_id = ?, position = ?,
                        basic_salary = ?, employment_type = ?,
                        email = ?, phone = ?
                 WHERE  emp_id = ?
             ");
             $stmt->execute([
-                $full_name, $dept_id, $position,
+                $full_name, $last_name, $dept_id, $position,
                 $basic_salary, $emp_type,
                 $email, $phone, $emp_id
             ]);
@@ -127,7 +128,7 @@ $total_pages = max(1, (int)ceil($total_rows / $per_page));
 
 // Fetch employees
 $stmt = $pdo->prepare("
-    SELECT e.emp_id, e.full_name, e.gender, e.phone, e.email,
+    SELECT e.emp_id, e.full_name, e.last_name, e.gender, e.phone, e.email,
            e.position, e.employment_type, e.basic_salary,
            e.status, e.employment_date,
            d.dept_name, d.dept_id
@@ -273,6 +274,9 @@ require_once $depth . 'includes/header.php';
                         <td><span class="badge badge-primary"><?= htmlspecialchars($e['emp_id']) ?></span></td>
                         <td>
                             <strong><?= htmlspecialchars($e['full_name']) ?></strong>
+                            <?php if ($e['last_name']): ?>
+                            <span style="color:var(--gray-400);font-size:0.82rem;"> <?= htmlspecialchars($e['last_name']) ?></span>
+                            <?php endif; ?>
                             <?php if ($e['email']): ?>
                             <br><small class="text-muted"><?= htmlspecialchars($e['email']) ?></small>
                             <?php endif; ?>
@@ -371,6 +375,14 @@ require_once $depth . 'includes/header.php';
                         <input type="text" name="full_name" class="form-control"
                                value="<?= htmlspecialchars($edit_emp['full_name']) ?>" required>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Name (Father's Name)</label>
+                        <input type="text" name="last_name" class="form-control"
+                               placeholder="e.g. Simane"
+                               value="<?= htmlspecialchars($edit_emp['last_name'] ?? '') ?>">
+                    </div>
+                </div>
+                <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Employee ID</label>
                         <input type="text" class="form-control"

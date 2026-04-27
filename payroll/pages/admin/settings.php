@@ -60,17 +60,28 @@ require_once $depth . 'includes/header.php';
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-cog" style="color:var(--primary);margin-right:8px"></i>Payroll Configuration</h3>
+            <span class="badge badge-warning"><i class="fas fa-lock"></i> Pension rates fixed by law</span>
         </div>
         <div class="card-body">
             <div class="form-group">
                 <label class="form-label">Employee Pension Rate (%)</label>
-                <input type="number" name="pension_emp" class="form-control" value="7" min="0" max="100" step="0.1">
-                <span class="form-hint">Standard: 18% of basic salary</span>
+                <input type="number" name="pension_emp" class="form-control"
+                       value="11" readonly
+                       style="background:var(--gray-100);cursor:not-allowed;color:var(--gray-600);">
+                <span class="form-hint">
+                    <i class="fas fa-lock" style="color:var(--warning);"></i>
+                    Fixed at <strong>11%</strong> of basic salary &mdash; set by Ethiopian law
+                </span>
             </div>
             <div class="form-group">
                 <label class="form-label">Employer Pension Rate (%)</label>
-                <input type="number" name="pension_org" class="form-control" value="11" min="0" max="100" step="0.1">
-                <span class="form-hint">Standard: 18% of basic salary</span>
+                <input type="number" name="pension_org" class="form-control"
+                       value="18" readonly
+                       style="background:var(--gray-100);cursor:not-allowed;color:var(--gray-600);">
+                <span class="form-hint">
+                    <i class="fas fa-lock" style="color:var(--warning);"></i>
+                    Fixed at <strong>18%</strong> of basic salary &mdash; set by Ethiopian law
+                </span>
             </div>
             <div class="form-group">
                 <label class="form-label">Payroll Processing Day</label>

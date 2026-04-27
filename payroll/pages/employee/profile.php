@@ -131,7 +131,12 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
             </div>
             <!-- Info -->
             <div class="profile-info">
-                <h2 style="margin:0 0 4px;"><?= htmlspecialchars($employee['full_name']) ?></h2>
+                <h2 style="margin:0 0 4px;">
+                    <?= htmlspecialchars($employee['full_name']) ?>
+                    <?php if ($employee['last_name']): ?>
+                    <span style="color:var(--gray-600);font-weight:500;"> <?= htmlspecialchars($employee['last_name']) ?></span>
+                    <?php endif; ?>
+                </h2>
                 <p style="color:var(--gray-600);margin:0 0 8px;">
                     <?= htmlspecialchars($employee['position']) ?> &mdash;
                     <?= htmlspecialchars($employee['dept_name']) ?>
@@ -177,7 +182,7 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
         <div class="card-body">
             <?php
             $personal = [
-                ['Full Name',       $employee['full_name'],                                    'fas fa-user'],
+                ['Full Name',       $employee['full_name'] . ($employee['last_name'] ? ' ' . $employee['last_name'] : ''), 'fas fa-user'],
                 ['Employee ID',     $employee['emp_id'],                                       'fas fa-id-badge'],
                 ['Gender',          ucfirst($employee['gender'] ?? '&mdash;'),                       'fas fa-venus-mars'],
                 ['Date of Birth',   $employee['date_of_birth']
@@ -293,10 +298,10 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px;">
             <?php
             $ded_cards = [
-                ['Income Tax',           $income_tax,  'var(--danger)',  'fas fa-percent',         'Based on 2025 tax brackets'],
-                ['Employee Pension (11% of basic salary)'],
-                ['Credit Association',   $credit_assoc,'var(--info)',    'fas fa-handshake',       '10% of basic salary'],
-                ['Renaissance Dam',      $gerd,        'var(--primary)', 'fas fa-water',           '1% of basic salary'],
+                ['Income Tax',                        $income_tax,  'var(--danger)',  'fas fa-percent',      'Based on 2025 tax brackets'],
+                ['Employee Pension (11% of basic)',   $pension_emp, 'var(--warning)', 'fas fa-piggy-bank',   '11% of basic salary'],
+                ['Credit Association',                $credit_assoc,'var(--info)',    'fas fa-handshake',    '10% of basic salary'],
+                ['Renaissance Dam',                   $gerd,        'var(--primary)', 'fas fa-water',        '1% of basic salary'],
             ];
             if ($loan > 0)
                 $ded_cards[] = ['Loan Repayment', $loan, 'var(--warning)', 'fas fa-hand-holding-usd', 'Monthly installment'];

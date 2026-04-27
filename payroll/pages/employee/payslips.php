@@ -10,7 +10,7 @@ $pdo = getDB();
 
 // Get employee record linked to this user
 $emp_stmt = $pdo->prepare("
-    SELECT e.emp_id, e.full_name, e.basic_salary, e.position, d.dept_name
+    SELECT e.emp_id, e.full_name, e.last_name, e.basic_salary, e.position, d.dept_name
     FROM   employees e
     JOIN   departments d ON e.dept_id = d.dept_id
     WHERE  e.user_id = ?
@@ -172,7 +172,7 @@ if ($employee) {
                         background:var(--bg-light);padding:14px;border-radius:var(--radius);margin-bottom:16px;">
                 <?php
                 $info = [
-                    ['Employee Name', $employee['full_name']],
+                    ['Employee Name', $employee['full_name'] . ($employee['last_name'] ?? '' ? ' ' . $employee['last_name'] : '')],
                     ['Employee ID',   $employee['emp_id']],
                     ['Department',    $employee['dept_name']],
                     ['Position',      $employee['position']],

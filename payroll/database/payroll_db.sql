@@ -367,3 +367,32 @@ CREATE TABLE IF NOT EXISTS password_resets (
     CONSTRAINT fk_reset_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Contact messages table
+-- Run once against payroll_db
+
+CREATE TABLE IF NOT EXISTS contact_messages (
+    message_id   INT          AUTO_INCREMENT PRIMARY KEY,
+    full_name    VARCHAR(120) NOT NULL,
+    email        VARCHAR(180) NOT NULL,
+    subject      VARCHAR(100) NOT NULL DEFAULT 'General Inquiry',
+    message      TEXT         NOT NULL,
+    ip_address   VARCHAR(45)  NULL,
+    is_read      TINYINT(1)   NOT NULL DEFAULT 0,
+    replied_at   DATETIME     NULL,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- Update pension rates: Employee 7%→11%, Employer 11%→18%
+-- Run in phpMyAdmin → payroll_db → SQL tab
+-- ============================================================
+
+USE payroll_db;
+
+-- Update system settings
+UPDATE system_settings SET setting_value = '0.11' WHERE setting_key = 'pension_employee_rate';
+UPDATE system_settings SET setting_value = '0.18' WHERE setting_key = 'pension_employer_rate';
+
+-- Verify
+SELECT setting_key, setting_value, description FROM system_settings
+WHERE setting_key LIKE 'pension%';
