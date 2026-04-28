@@ -44,6 +44,7 @@ $user_stmt = $pdo->prepare("
            e.emp_id, e.full_name AS emp_name, e.last_name, e.gender, e.date_of_birth,
            e.phone AS emp_phone, e.address, e.position, e.employment_type,
            e.basic_salary, e.employment_date, e.status AS emp_status,
+           e.cbe_account_number, e.cbe_account_name,
            d.dept_name
     FROM   users u
     LEFT JOIN employees e ON e.user_id = u.user_id
@@ -104,11 +105,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_photo'])) {
 
 // ── HANDLE PROFILE INFO UPDATE ─────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
-    $full_name = trim($_POST['full_name'] ?? '');
-    $last_name = trim($_POST['last_name'] ?? '') ?: null;
-    $email     = trim($_POST['email']     ?? '') ?: null;
-    $phone     = trim($_POST['phone']     ?? '') ?: null;
-    $address   = trim($_POST['address']   ?? '') ?: null;
+    $full_name          = trim($_POST['full_name']          ?? '');
+    $last_name          = trim($_POST['last_name']          ?? '') ?: null;
+    $email              = trim($_POST['email']              ?? '') ?: null;
+    $phone              = trim($_POST['phone']              ?? '') ?: null;
+    $address            = trim($_POST['address']            ?? '') ?: null;
+    // NOTE: cbe_account_number and cbe_account_name are NOT updatable by the employee
+    // They are set by HR during registration and can only be changed by HR
 
     if (empty($full_name)) {
         $error = 'Full name is required.';
@@ -119,19 +122,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
                 UPDATE users SET full_name = ?, email = ? WHERE user_id = ?
             ")->execute([$full_name, $email, $user_id]);
 
-            // Update employees table if linked
+            // Update employees table if linked (no CBE fields here)
             if ($user['emp_id']) {
                 $pdo->prepare("
-                    UPDATE employees SET full_name = ?, last_name = ?, email = ?, phone = ?, address = ?
+                    UPDATE employees
+                    SET full_name = ?, last_name = ?, email = ?, phone = ?, address = ?
                     WHERE emp_id = ?
-                ")->execute([$full_name, $last_name, $email, $phone, $address, $user['emp_id']]);
+                ")->execute([
+                    $full_name, $last_name, $email, $phone, $address,
+                    $user['emp_id']
+                ]);
             }
 
             // Update session
-            $_SESSION['name'] = $full_name;
-            $user['full_name'] = $full_name;
-            $user['last_name'] = $last_name;
-            $user['email']     = $email;
+            $_SESSION['name']          = $full_name;
+            $user['full_name']         = $full_name;
+            $user['last_name']         = $last_name;
+            $user['email']             = $email;
 
             // Notification
             $pdo->prepare("
@@ -340,6 +347,40 @@ require_once $depth . 'includes/header.php';
                     <input type="text" name="address" class="form-control"
                            value="<?= htmlspecialchars($user['address'] ?? '') ?>"
                            placeholder="Your address">
+                </div>
+
+                <!-- CBE Bank Account — read-only, set by HR -->
+                <div style="background:var(--info-light);border-radius:var(--radius);
+                            padding:14px;margin-bottom:16px;border-left:3px solid var(--info);">
+                    <p style="font-size:0.75rem;font-weight:700;color:var(--info);
+                               text-transform:uppercase;margin:0 0 10px;">
+                        <i class="fas fa-university"></i> CBE Bank Account (salary transfer)
+                    </p>
+                    <?php if ($user['cbe_account_number']): ?>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:0.85rem;">
+                        <div>
+                            <p style="font-size:0.7rem;color:var(--info);margin:0;text-transform:uppercase;">Account Number</p>
+                            <p style="font-weight:700;font-family:monospace;letter-spacing:1px;margin:0;color:var(--gray-800);">
+                                <?= htmlspecialchars($user['cbe_account_number']) ?>
+                            </p>
+                        </div>
+                        <div>
+                            <p style="font-size:0.7rem;color:var(--info);margin:0;text-transform:uppercase;">Account Holder</p>
+                            <p style="font-weight:700;margin:0;color:var(--gray-800);">
+                                <?= htmlspecialchars($user['cbe_account_name'] ?? '&mdash;') ?>
+                            </p>
+                        </div>
+                    </div>
+                    <p style="font-size:0.72rem;color:var(--info);margin:8px 0 0;">
+                        <i class="fas fa-lock"></i>
+                        Bank account details are managed by HR. Contact HR to update.
+                    </p>
+                    <?php else: ?>
+                    <p style="font-size:0.82rem;color:var(--warning);margin:0;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        No CBE account on file. Contact HR to add your bank account.
+                    </p>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
 

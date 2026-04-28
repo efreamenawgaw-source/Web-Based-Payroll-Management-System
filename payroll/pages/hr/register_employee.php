@@ -23,10 +23,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $post = $_POST;
 
     // Sanitise inputs
-    $emp_id          = strtoupper(trim($post['emp_id']          ?? ''));
-    $full_name       = trim($post['full_name']                  ?? '');
-    $last_name       = trim($post['last_name']                  ?? '') ?: null;
-    $gender          = trim($post['gender']                     ?? '');
+    $emp_id             = strtoupper(trim($post['emp_id']             ?? ''));
+    $full_name          = trim($post['full_name']                     ?? '');
+    $last_name          = trim($post['last_name']                     ?? '') ?: null;
+    $cbe_account_number = trim($post['cbe_account_number']            ?? '') ?: null;
+    $cbe_account_name   = trim($post['cbe_account_name']              ?? '') ?: null;
+    $gender             = trim($post['gender']                        ?? '');
     $dob             = trim($post['dob']                        ?? '') ?: null;
     $email           = trim($post['email']                      ?? '') ?: null;
     $phone           = trim($post['phone']                      ?? '');
@@ -69,14 +71,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Insert employee
             $stmt = $pdo->prepare("
                 INSERT INTO employees
-                    (emp_id, full_name, last_name, gender, date_of_birth, phone, email,
+                    (emp_id, full_name, last_name, cbe_account_number, cbe_account_name,
+                     gender, date_of_birth, phone, email,
                      dept_id, position, employment_type, basic_salary,
                      employment_date, status, created_by)
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
-                $emp_id, $full_name, $last_name, $gender, $dob, $phone, $email,
+                $emp_id, $full_name, $last_name, $cbe_account_number, $cbe_account_name,
+                $gender, $dob, $phone, $email,
                 $dept_id, $position, $emp_type, $basic_salary,
                 $employment_date, $status, $_SESSION['user_id']
             ]);
@@ -185,6 +189,32 @@ require_once $depth . 'includes/header.php';
                        placeholder="e.g. Simane"
                        value="<?= htmlspecialchars($post['last_name'] ?? '') ?>">
                 <span class="form-hint">Optional &mdash; 3rd name / family name</span>
+            </div>
+
+            <!-- CBE Bank Account -->
+            <div style="background:var(--info-light);border-radius:var(--radius);
+                        padding:14px;margin-bottom:4px;border-left:3px solid var(--info);">
+                <p style="font-size:0.78rem;font-weight:700;color:var(--info);
+                           text-transform:uppercase;margin:0 0 10px;">
+                    <i class="fas fa-university"></i> CBE Bank Account (for salary transfer)
+                </p>
+                <div class="form-row" style="margin-bottom:0;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">CBE Account Number</label>
+                        <input type="text" name="cbe_account_number" class="form-control"
+                               placeholder="e.g. 1000123456789"
+                               maxlength="20"
+                               value="<?= htmlspecialchars($post['cbe_account_number'] ?? '') ?>">
+                        <span class="form-hint">Commercial Bank of Ethiopia account number</span>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Account Holder Name</label>
+                        <input type="text" name="cbe_account_name" class="form-control"
+                               placeholder="Name as on CBE account"
+                               value="<?= htmlspecialchars($post['cbe_account_name'] ?? '') ?>">
+                        <span class="form-hint">Must match the name registered at CBE</span>
+                    </div>
+                </div>
             </div>
 
             <div class="form-row">

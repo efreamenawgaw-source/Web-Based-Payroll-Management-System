@@ -184,16 +184,18 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
             $personal = [
                 ['Full Name',       $employee['full_name'] . ($employee['last_name'] ? ' ' . $employee['last_name'] : ''), 'fas fa-user'],
                 ['Employee ID',     $employee['emp_id'],                                       'fas fa-id-badge'],
-                ['Gender',          ucfirst($employee['gender'] ?? '&mdash;'),                       'fas fa-venus-mars'],
+                ['Gender',          ucfirst($employee['gender'] ?? '&mdash;'),                 'fas fa-venus-mars'],
                 ['Date of Birth',   $employee['date_of_birth']
                                     ? date('M d, Y', strtotime($employee['date_of_birth']))
-                                    : '&mdash;',                                                     'fas fa-birthday-cake'],
-                ['Email',           $employee['email'] ?? '&mdash;',                                 'fas fa-envelope'],
-                ['Phone',           $employee['phone'] ?? '&mdash;',                                 'fas fa-phone'],
+                                    : '&mdash;',                                               'fas fa-birthday-cake'],
+                ['Email',           $employee['email'] ?? '&mdash;',                           'fas fa-envelope'],
+                ['Phone',           $employee['phone'] ?? '&mdash;',                           'fas fa-phone'],
                 ['Employment Date', $employee['employment_date']
                                     ? date('M d, Y', strtotime($employee['employment_date']))
-                                    : '&mdash;',                                                     'fas fa-calendar-check'],
+                                    : '&mdash;',                                               'fas fa-calendar-check'],
                 ['Employment Type', ucfirst(str_replace('_', '-', $employee['employment_type'])), 'fas fa-briefcase'],
+                ['CBE Account No.', $employee['cbe_account_number'] ?? '&mdash;',              'fas fa-university'],
+                ['CBE Account Name',$employee['cbe_account_name']   ?? '&mdash;',              'fas fa-id-card'],
                 ['Username',        $employee['username'],                                     'fas fa-user-circle'],
                 ['Last Login',      $employee['last_login']
                                     ? date('M d, Y H:i', strtotime($employee['last_login']))
@@ -354,6 +356,53 @@ $initials = strtoupper(substr($employee['full_name'], 0, 1));
                 &mdash; paid by BiT on your behalf. Not deducted from your salary.
             </span>
         </div>
+    </div>
+</div>
+
+<!-- ── CBE Bank Account ── -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h3><i class="fas fa-university" style="color:var(--info);margin-right:8px"></i>
+            CBE Bank Account
+        </h3>
+        <span class="badge badge-info">Salary Transfer</span>
+    </div>
+    <div class="card-body">
+        <?php if ($employee['cbe_account_number']): ?>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+            <div style="padding:16px;background:var(--info-light);border-radius:var(--radius);
+                        border-left:4px solid var(--info);">
+                <p style="font-size:0.72rem;color:var(--info);font-weight:700;
+                           text-transform:uppercase;margin:0 0 6px;">
+                    <i class="fas fa-hashtag"></i> Account Number
+                </p>
+                <p style="font-size:1.1rem;font-weight:700;color:var(--gray-800);
+                           font-family:monospace;letter-spacing:1px;margin:0;">
+                    <?= htmlspecialchars($employee['cbe_account_number']) ?>
+                </p>
+            </div>
+            <div style="padding:16px;background:var(--info-light);border-radius:var(--radius);
+                        border-left:4px solid var(--info);">
+                <p style="font-size:0.72rem;color:var(--info);font-weight:700;
+                           text-transform:uppercase;margin:0 0 6px;">
+                    <i class="fas fa-id-card"></i> Account Holder Name
+                </p>
+                <p style="font-size:1rem;font-weight:700;color:var(--gray-800);margin:0;">
+                    <?= htmlspecialchars($employee['cbe_account_name'] ?? '&mdash;') ?>
+                </p>
+            </div>
+        </div>
+        <p style="font-size:0.78rem;color:var(--gray-400);margin:12px 0 0;">
+            <i class="fas fa-info-circle"></i>
+            Your net salary is transferred to this CBE account each month after payroll is finalized.
+            Contact HR to update your bank details.
+        </p>
+        <?php else: ?>
+        <div class="alert alert-warning" style="margin:0;">
+            <i class="fas fa-exclamation-triangle"></i>
+            No CBE bank account on file. Please contact HR to add your account number for salary transfer.
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 

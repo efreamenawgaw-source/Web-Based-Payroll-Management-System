@@ -97,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_payroll'])) {
             SELECT
                 e.emp_id,
                 e.full_name,
+                e.cbe_account_number,
                 e.basic_salary,
                 COALESCE(a.housing, 0)             AS housing,
                 COALESCE(a.transport, 0)           AS transport,
@@ -198,10 +199,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_payroll'])) {
                 $net_pay = round($gross - $total_deductions, 2);
 
                 $results[] = [
-                    'emp_id'           => $emp['emp_id'],
-                    'full_name'        => $emp['full_name'],
-                    'dept_name'        => $emp['dept_name'],
-                    'basic_salary'     => $basic,
+                    'emp_id'              => $emp['emp_id'],
+                    'full_name'           => $emp['full_name'],
+                    'cbe_account_number'  => $emp['cbe_account_number'] ?? null,
+                    'dept_name'           => $emp['dept_name'],
+                    'basic_salary'        => $basic,
                     'working_days'     => $working_days,
                     'salary_expense'   => $salary_expense,
                     'allowances'       => $allowances,
@@ -268,7 +270,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payroll'])) {
 
             // 2. Re-run calculation and save each employee record
             $emp_stmt = $pdo->query("
-                SELECT e.emp_id, e.full_name, e.basic_salary,
+                SELECT e.emp_id, e.full_name, e.cbe_account_number, e.basic_salary,
                        COALESCE(a.housing,0) AS housing,
                        COALESCE(a.transport,0) AS transport,
                        COALESCE(a.position_allowance,0) AS position_allowance,
@@ -641,6 +643,9 @@ require_once $depth . 'includes/header.php';
                         <th rowspan="2" style="vertical-align:middle;background:var(--success-light);color:var(--success);">
                             Net Pay
                         </th>
+                        <th rowspan="2" style="vertical-align:middle;background:var(--info-light);color:var(--info);">
+                            CBE Account No.
+                        </th>
                     </tr>
                     <tr>
                         <th style="background:var(--danger-light);color:var(--danger);">Income Tax</th>
@@ -705,6 +710,11 @@ require_once $depth . 'includes/header.php';
                         <td class="text-bold" style="color:var(--success);font-size:1rem;">
                             <?= number_format($r['net_pay'], 2) ?>
                         </td>
+                        <td style="font-family:monospace;font-size:0.82rem;color:var(--info);">
+                            <?= $r['cbe_account_number']
+                                ? htmlspecialchars($r['cbe_account_number'])
+                                : '<span class="text-muted" style="font-family:sans-serif;">—</span>' ?>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -727,6 +737,7 @@ require_once $depth . 'includes/header.php';
                         <td style="padding:12px 16px;color:var(--danger);"><?= number_format($gt['penalty'] + $gt['other_ded'], 2) ?></td>
                         <td style="padding:12px 16px;color:var(--danger);"><?= number_format($gt['total_deductions'], 2) ?></td>
                         <td style="padding:12px 16px;color:var(--success);font-size:1rem;"><?= number_format($gt['net_pay'], 2) ?></td>
+                        <td style="padding:12px 16px;"></td>
                     </tr>
                 </tfoot>
             </table>

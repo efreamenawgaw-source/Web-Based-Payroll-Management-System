@@ -17,27 +17,33 @@ $departments = $pdo->query("
 
 // ── Handle UPDATE ──────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_employee'])) {
-    $emp_id       = trim($_POST['emp_id']       ?? '');
-    $full_name    = trim($_POST['full_name']     ?? '');
-    $last_name    = trim($_POST['last_name']     ?? '') ?: null;
-    $dept_id      = (int)($_POST['dept_id']      ?? 0);
-    $position     = trim($_POST['position']      ?? '');
-    $basic_salary = (float)($_POST['basic_salary'] ?? 0);
-    $emp_type     = trim($_POST['emp_type']      ?? 'permanent');
-    $email        = trim($_POST['email']         ?? '') ?: null;
-    $phone        = trim($_POST['phone']         ?? '');
+    $emp_id             = trim($_POST['emp_id']             ?? '');
+    $full_name          = trim($_POST['full_name']          ?? '');
+    $last_name          = trim($_POST['last_name']          ?? '') ?: null;
+    $cbe_account_number = trim($_POST['cbe_account_number'] ?? '') ?: null;
+    $cbe_account_name   = trim($_POST['cbe_account_name']   ?? '') ?: null;
+    $dept_id            = (int)($_POST['dept_id']           ?? 0);
+    $position           = trim($_POST['position']           ?? '');
+    $basic_salary       = (float)($_POST['basic_salary']    ?? 0);
+    $emp_type           = trim($_POST['emp_type']           ?? 'permanent');
+    $email              = trim($_POST['email']              ?? '') ?: null;
+    $phone              = trim($_POST['phone']              ?? '');
 
     if ($emp_id && $full_name && $dept_id && $position && $basic_salary > 0) {
         try {
             $stmt = $pdo->prepare("
                 UPDATE employees
-                SET    full_name = ?, last_name = ?, dept_id = ?, position = ?,
+                SET    full_name = ?, last_name = ?,
+                       cbe_account_number = ?, cbe_account_name = ?,
+                       dept_id = ?, position = ?,
                        basic_salary = ?, employment_type = ?,
                        email = ?, phone = ?
                 WHERE  emp_id = ?
             ");
             $stmt->execute([
-                $full_name, $last_name, $dept_id, $position,
+                $full_name, $last_name,
+                $cbe_account_number, $cbe_account_name,
+                $dept_id, $position,
                 $basic_salary, $emp_type,
                 $email, $phone, $emp_id
             ]);
@@ -129,6 +135,7 @@ $total_pages = max(1, (int)ceil($total_rows / $per_page));
 // Fetch employees
 $stmt = $pdo->prepare("
     SELECT e.emp_id, e.full_name, e.last_name, e.gender, e.phone, e.email,
+           e.cbe_account_number, e.cbe_account_name,
            e.position, e.employment_type, e.basic_salary,
            e.status, e.employment_date,
            d.dept_name, d.dept_id
@@ -388,6 +395,28 @@ require_once $depth . 'includes/header.php';
                         <input type="text" class="form-control"
                                value="<?= htmlspecialchars($edit_emp['emp_id']) ?>"
                                readonly style="background:var(--gray-100);">
+                    </div>
+                </div>
+                <!-- CBE Bank Account -->
+                <div style="background:var(--info-light);border-radius:var(--radius);
+                            padding:12px 14px;margin-bottom:12px;border-left:3px solid var(--info);">
+                    <p style="font-size:0.75rem;font-weight:700;color:var(--info);
+                               text-transform:uppercase;margin:0 0 10px;">
+                        <i class="fas fa-university"></i> CBE Bank Account
+                    </p>
+                    <div class="form-row" style="margin-bottom:0;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Account Number</label>
+                            <input type="text" name="cbe_account_number" class="form-control"
+                                   placeholder="e.g. 1000123456789" maxlength="20"
+                                   value="<?= htmlspecialchars($edit_emp['cbe_account_number'] ?? '') ?>">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Account Holder Name</label>
+                            <input type="text" name="cbe_account_name" class="form-control"
+                                   placeholder="Name as on CBE account"
+                                   value="<?= htmlspecialchars($edit_emp['cbe_account_name'] ?? '') ?>">
+                        </div>
                     </div>
                 </div>
                 <div class="form-row">

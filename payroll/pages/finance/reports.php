@@ -51,6 +51,9 @@ if ($f_period_id) {
             SELECT
                 pr.emp_id,
                 e.full_name,
+                e.last_name,
+                e.cbe_account_number,
+                e.cbe_account_name,
                 d.dept_name,
                 e.position,
                 pr.basic_salary,
@@ -238,6 +241,7 @@ if ($f_period_id) {
                         <th rowspan="2" style="vertical-align:middle;">#</th>
                         <th rowspan="2" style="vertical-align:middle;">Employee Name</th>
                         <th rowspan="2" style="vertical-align:middle;">Department</th>
+                        <th rowspan="2" style="vertical-align:middle;">CBE Account No.</th>
                         <th rowspan="2" style="vertical-align:middle;">Basic (ETB)</th>
                         <th rowspan="2" style="vertical-align:middle;">Days</th>
                         <th rowspan="2" style="vertical-align:middle;">Allowance (ETB)</th>
@@ -248,7 +252,7 @@ if ($f_period_id) {
                     </tr>
                     <tr>
                         <th style="background:var(--danger-light);color:var(--danger);">Tax</th>
-                        <th style="background:var(--warning-light);color:var(--warning);">Pension 18%</th>
+                        <th style="background:var(--warning-light);color:var(--warning);">Pension 11%</th>
                         <th style="background:var(--info-light);color:var(--info);">Other</th>
                         <th style="background:var(--info-light);color:var(--info);">Emp.Pension 18%</th>
                     </tr>
@@ -258,10 +262,15 @@ if ($f_period_id) {
                     <tr>
                         <td class="text-muted"><?= $i++ ?></td>
                         <td>
-                            <strong><?= htmlspecialchars($r['full_name']) ?></strong>
+                            <strong><?= htmlspecialchars($r['full_name']) ?><?= $r['last_name'] ? ' ' . htmlspecialchars($r['last_name']) : '' ?></strong>
                             <br><small class="text-muted"><?= htmlspecialchars($r['emp_id']) ?></small>
                         </td>
                         <td style="font-size:0.82rem;"><?= htmlspecialchars($r['dept_name']) ?></td>
+                        <td style="font-family:monospace;font-size:0.82rem;">
+                            <?= $r['cbe_account_number']
+                                ? htmlspecialchars($r['cbe_account_number'])
+                                : '<span class="text-muted">&mdash;</span>' ?>
+                        </td>
                         <td><?= number_format($r['basic_salary'], 2) ?></td>
                         <td style="text-align:center;">
                             <span class="badge <?= $r['working_days'] == 30 ? 'badge-success' : 'badge-warning' ?>">
@@ -281,7 +290,7 @@ if ($f_period_id) {
                 </tbody>
                 <tfoot>
                     <tr style="background:var(--bg-light);font-weight:700;">
-                        <td colspan="3" style="padding:12px 16px;color:var(--primary);">TOTALS (<?= count($report_rows) ?>)</td>
+                        <td colspan="4" style="padding:12px 16px;color:var(--primary);">TOTALS (<?= count($report_rows) ?>)</td>
                         <td style="padding:12px 16px;"><?= number_format($gt['basic'], 2) ?></td>
                         <td></td>
                         <td style="padding:12px 16px;"><?= number_format($gt['allowances'], 2) ?></td>
