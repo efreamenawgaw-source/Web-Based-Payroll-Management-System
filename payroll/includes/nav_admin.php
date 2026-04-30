@@ -26,18 +26,23 @@
    style="position:relative;">
     <i class="fas fa-inbox nav-icon"></i> Contact Messages
     <?php
-    // Show unread badge
+    // Show unread badge — wrapped in Throwable catch so any DB/table error is silent
     try {
-        $pdo_nav = getDB();
-        $unread_nav = (int)$pdo_nav->query("SELECT COUNT(*) FROM contact_messages WHERE is_read=0")->fetchColumn();
-        if ($unread_nav > 0): ?>
+        if (function_exists('getDB')) {
+            $pdo_nav    = getDB();
+            $unread_nav = (int)$pdo_nav->query("
+                SELECT COUNT(*) FROM contact_messages WHERE is_read = 0
+            ")->fetchColumn();
+            if ($unread_nav > 0): ?>
     <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);
                  background:var(--danger);color:white;border-radius:10px;
-                 font-size:0.65rem;font-weight:700;padding:1px 6px;min-width:18px;text-align:center;">
+                 font-size:0.65rem;font-weight:700;padding:1px 6px;
+                 min-width:18px;text-align:center;line-height:1.6;">
         <?= $unread_nav ?>
     </span>
-    <?php endif;
-    } catch (Exception $e) { /* table may not exist yet */ }
+    <?php   endif;
+        }
+    } catch (Throwable $e) { /* table not created yet — skip badge silently */ }
     ?>
 </a>
 

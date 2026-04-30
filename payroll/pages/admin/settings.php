@@ -3,10 +3,67 @@ $page_title = 'System Settings';
 $active_nav = 'settings';
 $depth      = '../../';
 
+require_once $depth . 'database/db_connect.php';
+
+$pdo     = getDB();
 $success = '';
+$error   = '';
+
+// ── Ensure system_settings table exists ───────────────────
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS system_settings (
+        setting_key   VARCHAR(80)  NOT NULL PRIMARY KEY,
+        setting_value VARCHAR(500) NOT NULL DEFAULT '',
+        updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// ── Handle Save ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $success = 'Settings saved successfully.';
+    $timeout = max(5, min(120, (int)($_POST['session_timeout'] ?? 15)));
+
+    $saveable = [
+        'inst_name'        => trim($_POST['inst_name']    ?? 'Bahir Dar Institute of Technology'),
+        'inst_short'       => trim($_POST['inst_short']   ?? 'BiT'),
+        'inst_address'     => trim($_POST['inst_address'] ?? ''),
+        'inst_email'       => trim($_POST['inst_email']   ?? ''),
+        'inst_phone'       => trim($_POST['inst_phone']   ?? ''),
+        'payroll_day'      => (int)($_POST['payroll_day'] ?? 28),
+        'currency'         => trim($_POST['currency']     ?? 'ETB'),
+        'session_timeout'  => $timeout,
+    ];
+
+    try {
+        $upsert = $pdo->prepare("
+            INSERT INTO system_settings (setting_key, setting_value)
+            VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+        ");
+        foreach ($saveable as $key => $val) {
+            $upsert->execute([$key, $val]);
+        }
+        $success = 'Settings saved successfully.';
+    } catch (PDOException $e) {
+        $error = 'Save failed: ' . $e->getMessage();
+    }
 }
+
+// ── Load current settings ──────────────────────────────────
+$settings = $pdo->query("SELECT setting_key, setting_value FROM system_settings")
+                ->fetchAll(PDO::FETCH_KEY_PAIR);
+
+// Defaults if not yet saved
+$s = array_merge([
+    'inst_name'       => 'Bahir Dar Institute of Technology',
+    'inst_short'      => 'BiT',
+    'inst_address'    => 'Bahir Dar, Amhara Region, Ethiopia',
+    'inst_email'      => 'payroll@bit.edu.et',
+    'inst_phone'      => '+251 58 220 6112',
+    'payroll_day'     => '28',
+    'currency'        => 'ETB',
+    'session_timeout' => '15',
+], $settings);
 
 require_once $depth . 'includes/header.php';
 ?>
@@ -23,6 +80,9 @@ require_once $depth . 'includes/header.php';
 <?php if ($success): ?>
 <div class="alert alert-success"><i class="fas fa-check-circle"></i> <?= $success ?></div>
 <?php endif; ?>
+<?php if ($error): ?>
+<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div>
+<?php endif; ?>
 
 <form method="POST" action="">
 <div class="grid-2" style="gap:24px;">
@@ -35,23 +95,28 @@ require_once $depth . 'includes/header.php';
         <div class="card-body">
             <div class="form-group">
                 <label class="form-label">Institution Name</label>
-                <input type="text" name="inst_name" class="form-control" value="Bahir Dar Institute of Technology">
+                <input type="text" name="inst_name" class="form-control"
+                       value="<?= htmlspecialchars($s['inst_name']) ?>">
             </div>
             <div class="form-group">
                 <label class="form-label">Short Name / Acronym</label>
-                <input type="text" name="inst_short" class="form-control" value="BiT">
+                <input type="text" name="inst_short" class="form-control"
+                       value="<?= htmlspecialchars($s['inst_short']) ?>">
             </div>
             <div class="form-group">
                 <label class="form-label">Address</label>
-                <input type="text" name="inst_address" class="form-control" value="Bahir Dar, Amhara Region, Ethiopia">
+                <input type="text" name="inst_address" class="form-control"
+                       value="<?= htmlspecialchars($s['inst_address']) ?>">
             </div>
             <div class="form-group">
                 <label class="form-label">Contact Email</label>
-                <input type="email" name="inst_email" class="form-control" value="payroll@bit.edu.et">
+                <input type="email" name="inst_email" class="form-control"
+                       value="<?= htmlspecialchars($s['inst_email']) ?>">
             </div>
             <div class="form-group">
                 <label class="form-label">Phone</label>
-                <input type="text" name="inst_phone" class="form-control" value="+251 58 220 6112">
+                <input type="text" name="inst_phone" class="form-control"
+                       value="<?= htmlspecialchars($s['inst_phone']) ?>">
             </div>
         </div>
     </div>
@@ -86,9 +151,9 @@ require_once $depth . 'includes/header.php';
             <div class="form-group">
                 <label class="form-label">Payroll Processing Day</label>
                 <select name="payroll_day" class="form-control">
-                    <option value="25">25th of each month</option>
-                    <option value="28" selected>28th of each month</option>
-                    <option value="30">Last day of month</option>
+                    <option value="25" <?= $s['payroll_day'] == 25 ? 'selected' : '' ?>>25th of each month</option>
+                    <option value="28" <?= $s['payroll_day'] == 28 ? 'selected' : '' ?>>28th of each month</option>
+                    <option value="30" <?= $s['payroll_day'] == 30 ? 'selected' : '' ?>>Last day of month</option>
                 </select>
             </div>
             <div class="form-group">
@@ -99,8 +164,13 @@ require_once $depth . 'includes/header.php';
             </div>
             <div class="form-group">
                 <label class="form-label">Session Timeout (minutes)</label>
-                <input type="number" name="session_timeout" class="form-control" value="15" min="5" max="120">
-                <span class="form-hint">Auto-logout after inactivity</span>
+                <input type="number" name="session_timeout" class="form-control"
+                       value="<?= (int)$s['session_timeout'] ?>" min="5" max="120">
+                <span class="form-hint">
+                    <i class="fas fa-clock" style="color:var(--info);"></i>
+                    Auto-logout after inactivity. Currently set to
+                    <strong><?= (int)$s['session_timeout'] ?> minutes</strong>.
+                </span>
             </div>
         </div>
     </div>

@@ -8,6 +8,40 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: ../../pages/auth/login.php');
     exit();
 }
+
+// ── Session timeout enforcement ────────────────────────────
+// Load timeout from DB (default 15 min if not set)
+$_timeout_minutes = 15;
+try {
+    require_once $depth . 'database/db_connect.php';
+    $_pdo_hdr = getDB();
+    $_t = $_pdo_hdr->query("
+        SELECT setting_value FROM system_settings WHERE setting_key = 'session_timeout'
+    ")->fetchColumn();
+    if ($_t !== false) {
+        $_timeout_minutes = max(5, (int)$_t);
+    }
+} catch (Throwable $e) { /* table not created yet — use default */ }
+
+$_timeout_seconds = $_timeout_minutes * 60;
+
+// Record last activity time on every page load
+if (!isset($_SESSION['last_activity'])) {
+    $_SESSION['last_activity'] = time();
+}
+
+// Check if session has expired
+if ((time() - $_SESSION['last_activity']) > $_timeout_seconds) {
+    // Expired — destroy session and redirect to login
+    session_unset();
+    session_destroy();
+    header('Location: ' . $depth . 'pages/auth/login.php?timeout=1');
+    exit();
+}
+
+// Refresh last activity timestamp
+$_SESSION['last_activity'] = time();
+
 $role       = $_SESSION['role']          ?? 'employee';
 $user_name  = $_SESSION['name']          ?? 'User';
 $username   = $_SESSION['username']      ?? '';
@@ -146,3 +180,85 @@ $_photo_url = !empty($_SESSION['profile_photo'])
 
         <!-- Page Content starts here -->
         <main class="page-content">
+
+<!-- ── Session timeout warning (JS side) ── -->
+<script>
+(function() {
+    const TIMEOUT_MS  = <?= $_timeout_seconds * 1000 ?>;  // from PHP
+    const WARN_BEFORE = 60 * 1000;   // show warning 60 seconds before expiry
+    let   lastActivity = Date.now();
+    let   warnTimer, logoutTimer;
+
+    // Reset on any user interaction
+    function resetTimer() {
+        lastActivity = Date.now();
+        clearTimeout(warnTimer);
+        clearTimeout(logoutTimer);
+        hideWarning();
+        scheduleWarning();
+    }
+
+    function scheduleWarning() {
+        warnTimer  = setTimeout(showWarning,  TIMEOUT_MS - WARN_BEFORE);
+        logoutTimer= setTimeout(doLogout,     TIMEOUT_MS);
+    }
+
+    function showWarning() {
+        let secs = 60;
+        const box = document.getElementById('sessionWarnBox');
+        const cnt = document.getElementById('sessionCountdown');
+        if (!box) return;
+        box.style.display = 'flex';
+        cnt.textContent   = secs;
+        const tick = setInterval(() => {
+            secs--;
+            cnt.textContent = secs;
+            if (secs <= 0) clearInterval(tick);
+        }, 1000);
+    }
+
+    function hideWarning() {
+        const box = document.getElementById('sessionWarnBox');
+        if (box) box.style.display = 'none';
+    }
+
+    function doLogout() {
+        window.location.href = '<?= $depth ?>pages/auth/logout.php?timeout=1';
+    }
+
+    // Extend session via AJAX ping
+    window.extendSession = function() {
+        fetch('<?= $depth ?>api/ping_session.php', { method: 'POST' })
+            .catch(() => {});
+        resetTimer();
+    };
+
+    // Listen for activity
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => {
+        document.addEventListener(ev, resetTimer, { passive: true });
+    });
+
+    scheduleWarning();
+})();
+</script>
+
+<!-- Session expiry warning banner -->
+<div id="sessionWarnBox"
+     style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+            z-index:9999;background:#0D47A1;color:white;border-radius:12px;
+            padding:14px 24px;box-shadow:0 8px 32px rgba(0,0,0,0.3);
+            align-items:center;gap:16px;font-size:0.9rem;max-width:420px;width:90%;">
+    <i class="fas fa-clock" style="font-size:1.4rem;flex-shrink:0;"></i>
+    <div style="flex:1;">
+        <strong>Session expiring soon</strong><br>
+        <span style="font-size:0.82rem;opacity:0.85;">
+            You will be logged out in <strong id="sessionCountdown">60</strong> seconds due to inactivity.
+        </span>
+    </div>
+    <button onclick="extendSession()"
+            style="background:white;color:#0D47A1;border:none;border-radius:8px;
+                   padding:8px 16px;font-weight:700;cursor:pointer;font-size:0.85rem;
+                   white-space:nowrap;flex-shrink:0;">
+        Stay Logged In
+    </button>
+</div>

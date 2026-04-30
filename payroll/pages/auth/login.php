@@ -173,6 +173,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <?php endif; ?>
 
+        <?php if (!empty($_GET['timeout'])): ?>
+        <div class="login-alert" style="background:#FFF3E0;color:#E65100;border-color:#E65100;">
+            <i class="fas fa-clock"></i>
+            Your session expired due to inactivity. Please log in again.
+        </div>
+        <?php endif; ?>
+
         <form class="login-form" method="POST" action="" novalidate>
             <div class="form-group">
                 <label class="form-label" for="username">Username</label>
