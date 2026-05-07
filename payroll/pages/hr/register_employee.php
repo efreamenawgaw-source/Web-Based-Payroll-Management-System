@@ -179,7 +179,7 @@ require_once $depth . 'includes/header.php';
             <div class="form-group">
                 <label class="form-label">Full Name <span style="color:var(--danger)">*</span></label>
                 <input type="text" name="full_name" class="form-control"
-                       placeholder="e.g. Admasu Dejene"
+                       placeholder="e.g. Efream Enawgaw"
                        value="<?= htmlspecialchars($post['full_name'] ?? '') ?>" required>
             </div>
 
