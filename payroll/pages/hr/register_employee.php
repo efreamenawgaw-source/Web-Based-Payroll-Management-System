@@ -240,7 +240,7 @@ require_once $depth . 'includes/header.php';
             <div class="form-group">
                 <label class="form-label">Email Address</label>
                 <input type="email" name="email" class="form-control"
-                       placeholder="employee@bit.edu.et"
+                       placeholder="employee@gmail.com"
                        value="<?= htmlspecialchars($post['email'] ?? '') ?>">
             </div>
 
