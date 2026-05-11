@@ -16,72 +16,90 @@ $LOCK_MINUTES = 15;         // lock duration
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
-    $password = trim($_POST['password'] ?? '');
+    $password = $_POST['password'] ?? '';   // do NOT trim passwords
 
     if (empty($username) || empty($password)) {
         $error = 'Please enter both username and password.';
+    } elseif (strlen($username) > 60 || strlen($password) > 200) {
+        $error = 'Invalid credentials.';   // reject oversized inputs silently
     } else {
         $pdo = getDB();
+        $ip  = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
-        // Fetch user
-        $stmt = $pdo->prepare("
-            SELECT user_id, username, password, role, full_name, is_active
-            FROM   users
-            WHERE  username = ?
-            LIMIT  1
+        // ── Brute-force lockout check ─────────────────────
+        $fail_stmt = $pdo->prepare("
+            SELECT COUNT(*) FROM audit_logs
+            WHERE  status = 'failed'
+            AND    action = 'Login'
+            AND    ip_address = ?
+            AND    logged_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)
         ");
-        $stmt->execute([$username]);
-        $user = $stmt->fetch();
+        $fail_stmt->execute([$ip, $LOCK_MINUTES]);
+        $recent_fails = (int)$fail_stmt->fetchColumn();
 
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-
-        if ($user && $user['is_active'] && password_verify($password, $user['password'])) {
-            // ── Successful login ──────────────────────────────
-            $_SESSION['user_id']       = $user['user_id'];
-            $_SESSION['username']      = $user['username'];
-            $_SESSION['role']          = $user['role'];
-            $_SESSION['name']          = $user['full_name'];
-            $_SESSION['profile_photo'] = $user['profile_photo'] ?? null;
-
-            // Update last_login
-            $pdo->prepare("UPDATE users SET last_login = NOW() WHERE user_id = ?")
-                ->execute([$user['user_id']]);
-
-            // Audit log — success
-            $pdo->prepare("
-                INSERT INTO audit_logs
-                    (user_id, username, role, action, details, ip_address, status)
-                VALUES (?, ?, ?, 'Login', 'Successful login', ?, 'success')
-            ")->execute([$user['user_id'], $user['username'], $user['role'], $ip]);
-
-            // Redirect by role
-            switch ($user['role']) {
-                case 'admin':    header('Location: ../admin/dashboard.php');    break;
-                case 'hr':       header('Location: ../hr/dashboard.php');       break;
-                case 'finance':  header('Location: ../finance/dashboard.php');  break;
-                case 'employee': header('Location: ../employee/dashboard.php'); break;
-                default:         header('Location: ../auth/login.php');
-            }
-            exit();
-
+        if ($recent_fails >= $MAX_ATTEMPTS) {
+            $error = "Too many failed login attempts. Please wait {$LOCK_MINUTES} minutes before trying again.";
         } else {
-            // ── Failed login ──────────────────────────────────
-            if ($user) {
-                // Log failed attempt
+            // Fetch user
+            $stmt = $pdo->prepare("
+                SELECT user_id, username, password, role, full_name, is_active, profile_photo
+                FROM   users
+                WHERE  username = ?
+                LIMIT  1
+            ");
+            $stmt->execute([$username]);
+            $user = $stmt->fetch();
+
+            if ($user && $user['is_active'] && password_verify($password, $user['password'])) {
+                // ── Successful login ──────────────────────
+                // Regenerate session ID to prevent session fixation
+                session_regenerate_id(true);
+
+                $_SESSION['user_id']       = $user['user_id'];
+                $_SESSION['username']      = $user['username'];
+                $_SESSION['role']          = $user['role'];
+                $_SESSION['name']          = $user['full_name'];
+                $_SESSION['profile_photo'] = $user['profile_photo'] ?? null;
+                $_SESSION['last_activity'] = time();
+
+                // Update last_login
+                $pdo->prepare("UPDATE users SET last_login = NOW() WHERE user_id = ?")
+                    ->execute([$user['user_id']]);
+
+                // Audit log — success
                 $pdo->prepare("
                     INSERT INTO audit_logs
                         (user_id, username, role, action, details, ip_address, status)
-                    VALUES (?, ?, ?, 'Login', 'Failed login attempt', ?, 'failed')
+                    VALUES (?, ?, ?, 'Login', 'Successful login', ?, 'success')
                 ")->execute([$user['user_id'], $user['username'], $user['role'], $ip]);
-            } else {
-                // Unknown username — notify admins of suspicious attempt
-                $pdo->prepare("
-                    INSERT INTO audit_logs
-                        (username, action, details, ip_address, status)
-                    VALUES (?, 'Login', 'Unknown username attempt', ?, 'failed')
-                ")->execute([$username, $ip]);
 
-                // Alert admins of repeated unknown login attempts
+                // Redirect by role
+                switch ($user['role']) {
+                    case 'admin':    header('Location: ../admin/dashboard.php');    break;
+                    case 'hr':       header('Location: ../hr/dashboard.php');       break;
+                    case 'finance':  header('Location: ../finance/dashboard.php');  break;
+                    case 'employee': header('Location: ../employee/dashboard.php'); break;
+                    default:         header('Location: ../auth/login.php');
+                }
+                exit();
+
+            } else {
+                // ── Failed login ──────────────────────────
+                if ($user) {
+                    $pdo->prepare("
+                        INSERT INTO audit_logs
+                            (user_id, username, role, action, details, ip_address, status)
+                        VALUES (?, ?, ?, 'Login', 'Failed login attempt', ?, 'failed')
+                    ")->execute([$user['user_id'], $user['username'], $user['role'], $ip]);
+                } else {
+                    $pdo->prepare("
+                        INSERT INTO audit_logs
+                            (username, action, details, ip_address, status)
+                        VALUES (?, 'Login', 'Unknown username attempt', ?, 'failed')
+                    ")->execute([$username, $ip]);
+                }
+
+                // Alert admins after 3 failures from same IP
                 try {
                     $fail_count = $pdo->prepare("
                         SELECT COUNT(*) FROM audit_logs
@@ -96,12 +114,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'danger');
                     }
                 } catch (Exception $e) { /* ignore */ }
-            }
 
-            if ($user && !$user['is_active']) {
-                $error = 'Your account has been deactivated. Contact the administrator.';
-            } else {
-                $error = 'Invalid username or password. Please try again.';
+                $remaining = max(0, $MAX_ATTEMPTS - $recent_fails - 1);
+                if ($user && !$user['is_active']) {
+                    $error = 'Your account has been deactivated. Contact the administrator.';
+                } elseif ($remaining > 0) {
+                    $error = "Invalid username or password. {$remaining} attempt(s) remaining before lockout.";
+                } else {
+                    $error = 'Invalid credentials.';
+                }
             }
         }
     }

@@ -85,7 +85,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_photo'])) {
                 $user['profile_photo']     = $filename;
                 $success = 'Profile photo updated successfully.';
 
-                // Notification — silently skip if table doesn't exist
                 try {
                     $pdo->prepare("
                         INSERT INTO notifications (user_id, title, message, type)
@@ -94,10 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_photo'])) {
                 } catch (Exception $e) { /* ignore */ }
 
             } else {
-                $error = 'Failed to save photo. '
-                       . 'Path: ' . $upload_path . ' | '
-                       . 'Folder: ' . (is_dir($uploads_fs) ? 'OK' : 'MISSING') . ' | '
-                       . 'Writable: ' . (is_writable($uploads_fs) ? 'YES' : 'NO');
+                $error = 'Failed to save photo. Please try again or contact the administrator.';
             }
         }
     }
@@ -105,16 +101,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_photo'])) {
 
 // ── HANDLE PROFILE INFO UPDATE ─────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
-    $full_name          = trim($_POST['full_name']          ?? '');
-    $last_name          = trim($_POST['last_name']          ?? '') ?: null;
-    $email              = trim($_POST['email']              ?? '') ?: null;
-    $phone              = trim($_POST['phone']              ?? '') ?: null;
-    $address            = trim($_POST['address']            ?? '') ?: null;
+    $full_name          = trim($_POST['full_name'] ?? '');
+    $last_name          = trim($_POST['last_name'] ?? '') ?: null;
+    $email              = trim($_POST['email']     ?? '') ?: null;
+    $phone              = trim($_POST['phone']     ?? '') ?: null;
+    $address            = trim($_POST['address']   ?? '') ?: null;
     // NOTE: cbe_account_number and cbe_account_name are NOT updatable by the employee
-    // They are set by HR during registration and can only be changed by HR
 
-    if (empty($full_name)) {
-        $error = 'Full name is required.';
+    $errs = [];
+
+    if (empty($full_name))
+        $errs[] = 'Full name is required.';
+    elseif (strlen($full_name) < 2 || strlen($full_name) > 100)
+        $errs[] = 'Full name must be 2–100 characters.';
+    elseif (!preg_match('/^[\p{L}\s\'\-\.]+$/u', $full_name))
+        $errs[] = 'Full name may only contain letters, spaces, hyphens, apostrophes, and dots.';
+
+    if ($last_name !== null && strlen($last_name) > 100)
+        $errs[] = 'Last name must be 100 characters or fewer.';
+
+    if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL))
+        $errs[] = 'Please enter a valid email address.';
+
+    if ($phone !== null && !preg_match('/^(\+251|0)[0-9]{8,13}$/', preg_replace('/[\s\-]/', '', $phone)))
+        $errs[] = 'Phone must be a valid Ethiopian number (e.g. +251911234567 or 0911234567).';
+
+    if ($address !== null && strlen($address) > 255)
+        $errs[] = 'Address must be 255 characters or fewer.';
+
+    if (!empty($errs)) {
+        $error = implode('<br>', $errs);
     } else {
         try {
             // Update users table
@@ -155,22 +171,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
 
 // ── HANDLE PASSWORD CHANGE ─────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
-    $current_pass = trim($_POST['current_password'] ?? '');
-    $new_pass     = trim($_POST['new_password']     ?? '');
-    $confirm_pass = trim($_POST['confirm_password'] ?? '');
+    $current_pass = $_POST['current_password'] ?? '';   // do NOT trim
+    $new_pass     = $_POST['new_password']     ?? '';
+    $confirm_pass = $_POST['confirm_password'] ?? '';
 
     if (empty($current_pass) || empty($new_pass) || empty($confirm_pass)) {
         $error = 'All password fields are required.';
     } elseif (!password_verify($current_pass, $user['password'])) {
         $error = 'Current password is incorrect.';
-    } elseif (strlen($new_pass) < 6) {
-        $error = 'New password must be at least 6 characters.';
+    } elseif (strlen($new_pass) < 8) {
+        $error = 'New password must be at least 8 characters.';
+    } elseif (!preg_match('/[A-Z]/', $new_pass)) {
+        $error = 'New password must contain at least one uppercase letter.';
+    } elseif (!preg_match('/[0-9]/', $new_pass)) {
+        $error = 'New password must contain at least one number.';
     } elseif ($new_pass !== $confirm_pass) {
         $error = 'New passwords do not match.';
     } else {
         $hash = password_hash($new_pass, PASSWORD_BCRYPT, ['cost' => 12]);
         $pdo->prepare("UPDATE users SET password = ? WHERE user_id = ?")
             ->execute([$hash, $user_id]);
+
+        // Regenerate session after password change
+        session_regenerate_id(true);
 
         // Audit log
         $pdo->prepare("
@@ -474,7 +497,7 @@ require_once $depth . 'includes/header.php';
 
                 <div class="alert alert-info" style="font-size:0.82rem;">
                     <i class="fas fa-info-circle"></i>
-                    Use at least 6 characters. Mix letters, numbers, and symbols for a strong password.
+                    Use at least <strong>8 characters</strong> with at least 1 uppercase letter and 1 number for a strong password.
                 </div>
 
                 <button type="submit" name="change_password" class="btn btn-warning w-100">

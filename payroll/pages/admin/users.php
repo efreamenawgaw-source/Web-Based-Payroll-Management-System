@@ -11,26 +11,74 @@ $pdo     = getDB();
 $success = '';
 $error   = '';
 
+// ── Allowed positions & types (whitelist) ─────────────────
+$VALID_ROLES      = ['admin','hr','finance','employee'];
+$VALID_EMP_TYPES  = ['permanent','contract','part_time'];
+$VALID_STATUSES   = ['active','on_leave'];
+$VALID_POSITIONS  = [
+    'Professor','Associate Professor','Senior Lecturer','Lecturer',
+    'Assistant Lecturer','Administrative Officer','HR Officer',
+    'Finance Officer','Technician','Librarian','Security Staff',
+    'IT Officer','Cleaner','Driver',
+];
+
 // ── CREATE user ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     $full_name = trim($_POST['full_name'] ?? '');
-    $username  = trim($_POST['username']  ?? '');
-    $password  = trim($_POST['password']  ?? '');
+    $username  = strtolower(trim($_POST['username'] ?? ''));
+    $password  = $_POST['password'] ?? '';          // do NOT trim passwords
     $role      = trim($_POST['role']      ?? '');
     $email     = trim($_POST['email']     ?? '') ?: null;
 
     $errs = [];
-    if (!$full_name) $errs[] = 'Full name is required.';
-    if (!$username)  $errs[] = 'Username is required.';
-    if (strlen($password) < 6) $errs[] = 'Password must be at least 6 characters.';
-    if (!in_array($role, ['admin','hr','finance','employee'])) $errs[] = 'Invalid role.';
+
+    // Full name
+    if (empty($full_name))
+        $errs[] = 'Full name is required.';
+    elseif (strlen($full_name) < 2 || strlen($full_name) > 100)
+        $errs[] = 'Full name must be between 2 and 100 characters.';
+    elseif (!preg_match('/^[\p{L}\s\'\-\.]+$/u', $full_name))
+        $errs[] = 'Full name may only contain letters, spaces, hyphens, apostrophes, and dots.';
+
+    // Username
+    if (empty($username))
+        $errs[] = 'Username is required.';
+    elseif (strlen($username) < 3 || strlen($username) > 30)
+        $errs[] = 'Username must be between 3 and 30 characters.';
+    elseif (!preg_match('/^[a-z0-9_\.]+$/', $username))
+        $errs[] = 'Username may only contain lowercase letters, numbers, underscores, and dots.';
+
+    // Password
+    if (strlen($password) < 8)
+        $errs[] = 'Password must be at least 8 characters.';
+    elseif (!preg_match('/[A-Z]/', $password))
+        $errs[] = 'Password must contain at least one uppercase letter.';
+    elseif (!preg_match('/[0-9]/', $password))
+        $errs[] = 'Password must contain at least one number.';
+
+    // Role
+    if (!in_array($role, $VALID_ROLES, true))
+        $errs[] = 'Please select a valid role.';
+
+    // Email (optional but must be valid if provided)
+    if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL))
+        $errs[] = 'Please enter a valid email address.';
+    elseif ($email !== null && strlen($email) > 180)
+        $errs[] = 'Email address is too long (max 180 characters).';
 
     if (empty($errs)) {
         // Check duplicate username
         $chk = $pdo->prepare("SELECT user_id FROM users WHERE username = ?");
         $chk->execute([$username]);
-        if ($chk->fetch()) {
-            $errs[] = "Username <strong>{$username}</strong> already exists.";
+        if ($chk->fetch())
+            $errs[] = 'Username <strong>' . htmlspecialchars($username) . '</strong> already exists.';
+
+        // Check duplicate email
+        if ($email) {
+            $echk = $pdo->prepare("SELECT user_id FROM users WHERE email = ?");
+            $echk->execute([$email]);
+            if ($echk->fetch())
+                $errs[] = 'Email <strong>' . htmlspecialchars($email) . '</strong> is already registered.';
         }
     }
 
@@ -101,11 +149,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     $role      = trim($_POST['role']       ?? '');
     $email     = trim($_POST['email']      ?? '') ?: null;
     $is_active = isset($_POST['is_active']) ? 1 : 0;
-    $new_pass  = trim($_POST['new_password'] ?? '');
+    $new_pass  = $_POST['new_password'] ?? '';   // do NOT trim passwords
 
-    if ($uid && $full_name && in_array($role, ['admin','hr','finance','employee'])) {
+    $errs = [];
+
+    if (empty($full_name))
+        $errs[] = 'Full name is required.';
+    elseif (strlen($full_name) < 2 || strlen($full_name) > 100)
+        $errs[] = 'Full name must be between 2 and 100 characters.';
+
+    if (!in_array($role, $VALID_ROLES, true))
+        $errs[] = 'Please select a valid role.';
+
+    if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL))
+        $errs[] = 'Please enter a valid email address.';
+
+    if (!empty($new_pass)) {
+        if (strlen($new_pass) < 8)
+            $errs[] = 'New password must be at least 8 characters.';
+        elseif (!preg_match('/[A-Z]/', $new_pass))
+            $errs[] = 'New password must contain at least one uppercase letter.';
+        elseif (!preg_match('/[0-9]/', $new_pass))
+            $errs[] = 'New password must contain at least one number.';
+    }
+
+    if (!$uid)
+        $errs[] = 'Invalid user.';
+
+    if (empty($errs)) {
         try {
-            if ($new_pass && strlen($new_pass) >= 6) {
+            if (!empty($new_pass)) {
                 $hash = password_hash($new_pass, PASSWORD_BCRYPT, ['cost' => 12]);
                 $pdo->prepare("
                     UPDATE users SET full_name=?, role=?, email=?, is_active=?, password=?
@@ -156,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
             $error = 'Update failed: ' . $e->getMessage();
         }
     } else {
-        $error = 'Invalid data. Please check all fields.';
+        $error = implode('<br>', $errs);
     }
 }
 
@@ -565,7 +638,8 @@ require_once $depth . 'includes/header.php';
                 <div class="form-group">
                     <label class="form-label">Full Name <span style="color:var(--danger)">*</span></label>
                     <input type="text" name="full_name" class="form-control"
-                           placeholder="e.g. Admasu Dejene" required>
+                           placeholder="e.g. Admasu Dejene"
+                           minlength="2" maxlength="100" required>
                 </div>
 
                 <div class="form-group">
@@ -576,14 +650,19 @@ require_once $depth . 'includes/header.php';
                         </span>
                     </label>
                     <input type="email" name="email" class="form-control"
-                           placeholder="employee@gmail.com" required>
+                           placeholder="employee@gmail.com" maxlength="180" required>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Username <span style="color:var(--danger)">*</span></label>
                         <input type="text" name="username" class="form-control"
-                               placeholder="e.g. admasu.d" required>
+                               placeholder="e.g. admasu.d"
+                               minlength="3" maxlength="30"
+                               pattern="[a-z0-9_\.]+"
+                               title="Lowercase letters, numbers, underscores and dots only"
+                               required>
+                        <span class="form-hint">Lowercase letters, numbers, underscores and dots only</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Role <span style="color:var(--danger)">*</span></label>
@@ -605,9 +684,10 @@ require_once $depth . 'includes/header.php';
                         </span>
                     </label>
                     <div style="position:relative;">
-                        <input type="text" name="password" id="newUserPass"
+                        <input type="password" name="password" id="newUserPass"
                                class="form-control"
-                               placeholder="Min. 6 characters" required
+                               placeholder="Min. 8 chars, 1 uppercase, 1 number"
+                               minlength="8" maxlength="100" required
                                style="padding-right:110px;">
                         <button type="button" onclick="generatePassword()"
                                 style="position:absolute;right:6px;top:50%;transform:translateY(-50%);
@@ -618,7 +698,8 @@ require_once $depth . 'includes/header.php';
                         </button>
                     </div>
                     <span class="form-hint">
-                        The employee will receive this password by email and should change it after first login.
+                        Min. 8 characters with at least 1 uppercase letter and 1 number.
+                        The employee will receive this password by email.
                     </span>
                 </div>
 
@@ -762,18 +843,35 @@ require_once $depth . 'includes/header.php';
 <?php endif; ?>
 
 <script>
-// Generate a strong random password
+// Generate a strong random password that meets validation rules:
+// min 8 chars, at least 1 uppercase, 1 number, 1 special char
 function generatePassword() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!';
-    let pass = '';
-    for (let i = 0; i < 10; i++) {
-        pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower   = 'abcdefghjkmnpqrstuvwxyz';
+    const digits  = '23456789';
+    const special = '@#$!';
+    const all     = upper + lower + digits + special;
+
+    // Guarantee at least one of each required type
+    let pass = [
+        upper.charAt(Math.floor(Math.random() * upper.length)),
+        digits.charAt(Math.floor(Math.random() * digits.length)),
+        special.charAt(Math.floor(Math.random() * special.length)),
+    ];
+    // Fill remaining 7 chars from all
+    for (let i = 0; i < 7; i++) {
+        pass.push(all.charAt(Math.floor(Math.random() * all.length)));
     }
+    // Shuffle
+    pass = pass.sort(() => Math.random() - 0.5).join('');
+
     const input = document.getElementById('newUserPass');
     if (input) {
         input.value = pass;
-        input.type  = 'text';
+        input.type  = 'text';   // show generated password briefly
         input.focus();
+        // Hide after 3 seconds
+        setTimeout(() => { if (input.type === 'text') input.type = 'password'; }, 3000);
     }
 }
 </script>

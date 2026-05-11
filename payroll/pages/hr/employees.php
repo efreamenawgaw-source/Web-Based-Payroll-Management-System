@@ -29,7 +29,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_employee'])) {
     $email              = trim($_POST['email']              ?? '') ?: null;
     $phone              = trim($_POST['phone']              ?? '');
 
-    if ($emp_id && $full_name && $dept_id && $position && $basic_salary > 0) {
+    $valid_positions = [
+        'Professor','Associate Professor','Senior Lecturer','Lecturer',
+        'Assistant Lecturer','Administrative Officer','HR Officer',
+        'Finance Officer','Technician','Librarian','Security Staff',
+        'IT Officer','Cleaner','Driver',
+    ];
+    $valid_emp_types = ['permanent','contract','part_time'];
+
+    $errs = [];
+
+    if (empty($emp_id))
+        $errs[] = 'Employee ID is missing.';
+
+    if (empty($full_name))
+        $errs[] = 'Full name is required.';
+    elseif (strlen($full_name) < 2 || strlen($full_name) > 100)
+        $errs[] = 'Full name must be 2–100 characters.';
+    elseif (!preg_match('/^[\p{L}\s\'\-\.]+$/u', $full_name))
+        $errs[] = 'Full name may only contain letters, spaces, hyphens, apostrophes, and dots.';
+
+    if ($dept_id === 0)
+        $errs[] = 'Department is required.';
+    else {
+        // Verify dept exists
+        $dchk = $pdo->prepare("SELECT dept_id FROM departments WHERE dept_id = ? AND is_active = 1");
+        $dchk->execute([$dept_id]);
+        if (!$dchk->fetch()) $errs[] = 'Selected department is invalid.';
+    }
+
+    if (!in_array($position, $valid_positions, true))
+        $errs[] = 'Please select a valid position.';
+
+    if ($basic_salary <= 0)
+        $errs[] = 'Basic salary must be greater than 0.';
+    elseif ($basic_salary > 500000)
+        $errs[] = 'Basic salary seems too high. Please verify.';
+
+    if (!in_array($emp_type, $valid_emp_types, true))
+        $errs[] = 'Please select a valid employment type.';
+
+    if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL))
+        $errs[] = 'Please enter a valid email address.';
+
+    if (!empty($phone) && !preg_match('/^(\+251|0)[0-9]{8,13}$/', preg_replace('/[\s\-]/', '', $phone)))
+        $errs[] = 'Phone must be a valid Ethiopian number (e.g. +251911234567 or 0911234567).';
+
+    if ($cbe_account_number !== null && !preg_match('/^[0-9]{10,20}$/', $cbe_account_number))
+        $errs[] = 'CBE account number must be 10–20 digits only.';
+
+    if (empty($errs)) {
         try {
             $stmt = $pdo->prepare("
                 UPDATE employees
@@ -58,12 +107,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_employee'])) {
                 $emp_id, "Updated: {$full_name}", $_SERVER['REMOTE_ADDR'] ?? null
             ]);
 
-            $success = "Employee <strong>{$full_name}</strong> updated successfully.";
+            $success = "Employee <strong>" . htmlspecialchars($full_name) . "</strong> updated successfully.";
         } catch (PDOException $e) {
             $error = 'Update failed: ' . $e->getMessage();
         }
     } else {
-        $error = 'Please fill in all required fields.';
+        $error = implode('<br>', $errs);
     }
 }
 

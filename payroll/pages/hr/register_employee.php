@@ -44,24 +44,115 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $teaching        = (float)($post['teaching']                ?? 0);
     $other           = (float)($post['other']                   ?? 0);
 
-    // Validation
+    // ── Whitelists ─────────────────────────────────────────
+    $valid_positions = [
+        'Professor','Associate Professor','Senior Lecturer','Lecturer',
+        'Assistant Lecturer','Administrative Officer','HR Officer',
+        'Finance Officer','Technician','Librarian','Security Staff',
+        'IT Officer','Cleaner','Driver',
+    ];
+    $valid_emp_types = ['permanent','contract','part_time'];
+    $valid_statuses  = ['active','on_leave'];
+    $valid_genders   = ['male','female','other'];
+
+    // ── Validation ─────────────────────────────────────────
     $errors = [];
-    if (empty($emp_id))          $errors[] = 'Employee ID is required.';
-    if (empty($full_name))       $errors[] = 'Full name is required.';
-    if (empty($gender))          $errors[] = 'Gender is required.';
-    if (empty($phone))           $errors[] = 'Phone number is required.';
-    if ($dept_id === 0)          $errors[] = 'Department is required.';
-    if (empty($position))        $errors[] = 'Position is required.';
-    if ($basic_salary <= 0)      $errors[] = 'Basic salary must be greater than 0.';
-    if (empty($employment_date)) $errors[] = 'Employment date is required.';
+
+    // Employee ID: required, alphanumeric + hyphen, 3-20 chars
+    if (empty($emp_id))
+        $errors[] = 'Employee ID is required.';
+    elseif (!preg_match('/^[A-Z0-9\-]{3,20}$/', $emp_id))
+        $errors[] = 'Employee ID must be 3–20 characters (letters, numbers, hyphens only).';
+
+    // Full name: required, letters/spaces/hyphens, 2-100 chars
+    if (empty($full_name))
+        $errors[] = 'Full name is required.';
+    elseif (strlen($full_name) < 2 || strlen($full_name) > 100)
+        $errors[] = 'Full name must be 2–100 characters.';
+    elseif (!preg_match('/^[\p{L}\s\'\-\.]+$/u', $full_name))
+        $errors[] = 'Full name may only contain letters, spaces, hyphens, apostrophes, and dots.';
+
+    // Last name: optional, same rules if provided
+    if ($last_name !== null && strlen($last_name) > 100)
+        $errors[] = 'Last name must be 100 characters or fewer.';
+
+    // Gender: whitelist
+    if (!in_array($gender, $valid_genders, true))
+        $errors[] = 'Please select a valid gender.';
+
+    // Phone: required, Ethiopian format (+251 or 09/07 prefix), 9-15 digits
+    if (empty($phone))
+        $errors[] = 'Phone number is required.';
+    elseif (!preg_match('/^(\+251|0)[0-9]{8,13}$/', preg_replace('/[\s\-]/', '', $phone)))
+        $errors[] = 'Phone must be a valid Ethiopian number (e.g. +251911234567 or 0911234567).';
+
+    // Email: optional but must be valid if provided
+    if ($email !== null) {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL))
+            $errors[] = 'Please enter a valid email address.';
+        elseif (strlen($email) > 180)
+            $errors[] = 'Email address is too long (max 180 characters).';
+    }
+
+    // Department: must exist in DB
+    if ($dept_id === 0)
+        $errors[] = 'Department is required.';
+
+    // Position: whitelist
+    if (!in_array($position, $valid_positions, true))
+        $errors[] = 'Please select a valid position.';
+
+    // Basic salary: positive, reasonable range
+    if ($basic_salary <= 0)
+        $errors[] = 'Basic salary must be greater than 0.';
+    elseif ($basic_salary > 500000)
+        $errors[] = 'Basic salary seems too high. Please verify.';
+
+    // Employment date: required, not in the future, not before 1990
+    if (empty($employment_date))
+        $errors[] = 'Employment date is required.';
+    elseif (strtotime($employment_date) > strtotime('today'))
+        $errors[] = 'Employment date cannot be in the future.';
+    elseif (strtotime($employment_date) < strtotime('1990-01-01'))
+        $errors[] = 'Employment date seems too far in the past.';
+
+    // Date of birth: optional, must be in the past, age 18–80
+    if ($dob !== null) {
+        $age = (int)date_diff(date_create($dob), date_create('today'))->y;
+        if (strtotime($dob) >= strtotime('today'))
+            $errors[] = 'Date of birth must be in the past.';
+        elseif ($age < 18 || $age > 80)
+            $errors[] = 'Employee age must be between 18 and 80 years.';
+    }
+
+    // Employment type: whitelist
+    if (!in_array($emp_type, $valid_emp_types, true))
+        $errors[] = 'Please select a valid employment type.';
+
+    // Status: whitelist
+    if (!in_array($status, $valid_statuses, true))
+        $errors[] = 'Please select a valid status.';
+
+    // CBE account number: optional, digits only, 10-20 chars
+    if ($cbe_account_number !== null) {
+        if (!preg_match('/^[0-9]{10,20}$/', $cbe_account_number))
+            $errors[] = 'CBE account number must be 10–20 digits only.';
+    }
+
+    // Allowances: non-negative
+    foreach (['housing' => $housing, 'transport' => $transport,
+              'position_allowance' => $position_allow,
+              'teaching' => $teaching, 'other' => $other] as $fname => $fval) {
+        if ($fval < 0)
+            $errors[] = ucwords(str_replace('_', ' ', $fname)) . ' cannot be negative.';
+    }
 
     // Check duplicate emp_id
     if (empty($errors)) {
         $chk = $pdo->prepare("SELECT emp_id FROM employees WHERE emp_id = ?");
         $chk->execute([$emp_id]);
-        if ($chk->fetch()) {
-            $errors[] = "Employee ID <strong>{$emp_id}</strong> already exists.";
-        }
+        if ($chk->fetch())
+            $errors[] = 'Employee ID <strong>' . htmlspecialchars($emp_id) . '</strong> already exists.';
     }
 
     if (empty($errors)) {
