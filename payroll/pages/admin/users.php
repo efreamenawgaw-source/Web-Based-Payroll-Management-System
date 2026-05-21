@@ -102,24 +102,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
                 $_SERVER['REMOTE_ADDR'] ?? null
             ]);
 
-            $success = "User <strong>{$full_name}</strong> ({$username}) created successfully.";
+            $success = "User <strong>" . htmlspecialchars($full_name) . "</strong> ("
+                     . htmlspecialchars($username) . ") created successfully.";
 
-            // Send welcome email if user has an email address
+            // Store credentials to show on screen (admin can give to user manually)
+            $_SESSION['new_user_credentials'] = [
+                'full_name' => $full_name,
+                'username'  => $username,
+                'password'  => $password,
+                'role'      => ucfirst($role),
+                'email'     => $email,
+            ];
+
+            // Try to send welcome email — but don't block if it fails
             if ($email) {
-                $login_url = (isset($_SERVER['HTTPS']) ? 'https' : 'http')
-                           . '://' . $_SERVER['HTTP_HOST']
-                           . dirname(dirname($_SERVER['SCRIPT_NAME']))
-                           . '/auth/login.php';
+                try {
+                    $login_url = (isset($_SERVER['HTTPS']) ? 'https' : 'http')
+                               . '://' . $_SERVER['HTTP_HOST']
+                               . dirname(dirname($_SERVER['SCRIPT_NAME']))
+                               . '/auth/login.php';
 
-                $html = buildWelcomeEmail($full_name, $username, $password, $role, $login_url);
-                $mail_result = sendMail($email, $full_name,
-                    'Welcome to BiT Payroll System — Your Account Details',
-                    $html);
+                    $html = buildWelcomeEmail($full_name, $username, $password, $role, $login_url);
+                    $mail_result = sendMail($email, $full_name,
+                        'Welcome to BiT Payroll System — Your Account Details',
+                        $html);
 
-                if ($mail_result['success']) {
-                    $success .= ' <span style="color:var(--success);">✉️ Welcome email sent to ' . htmlspecialchars($email) . '</span>';
-                } else {
-                    $success .= ' <span style="color:var(--warning);">⚠️ Email not sent: ' . htmlspecialchars($mail_result['error']) . '</span>';
+                    if ($mail_result['success']) {
+                        $success .= ' <span style="color:var(--success);">✉️ Welcome email sent to '
+                                  . htmlspecialchars($email) . '</span>';
+                        // Email sent — no need to show credentials on screen
+                        unset($_SESSION['new_user_credentials']);
+                    }
+                    // If email fails, credentials stay in session to show on screen
+                } catch (Exception $e) {
+                    // Email failed silently — credentials will show on screen
                 }
             }
 

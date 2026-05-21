@@ -77,7 +77,12 @@ function sendMail(string $to_email, string $to_name, string $subject, string $ht
         $mail->SMTPAuth   = true;
         $mail->Username   = $username;
         $mail->Password   = $password;
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        // Port 465 uses SSL, port 587 uses STARTTLS
+        if ((int)$port === 465) {
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        } else {
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        }
         $mail->Port       = $port;
         $mail->CharSet    = 'UTF-8';
 

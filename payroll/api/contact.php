@@ -26,10 +26,24 @@ $ip        = $_SERVER['REMOTE_ADDR'] ?? null;
 
 // ── Validate ───────────────────────────────────────────────
 $errors = [];
+
+// Full name: letters and spaces only, 2–100 chars
 if (empty($full_name) || strlen($full_name) < 2)
     $errors[] = 'Full name is required (min 2 characters).';
-if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL))
-    $errors[] = 'A valid email address is required.';
+elseif (strlen($full_name) > 100)
+    $errors[] = 'Full name is too long (max 100 characters).';
+elseif (!preg_match('/^[\p{L}\s\'\-\.]+$/u', $full_name))
+    $errors[] = 'Full name must contain letters only — no numbers or symbols.';
+
+// Email: must be a valid @gmail.com address
+if (empty($email))
+    $errors[] = 'Email address is required.';
+elseif (!preg_match('/^[a-zA-Z0-9._%+\-]+@gmail\.com$/i', $email))
+    $errors[] = 'Email must be a valid Gmail address ending with @gmail.com';
+elseif (strlen($email) > 180)
+    $errors[] = 'Email address is too long.';
+
+// Message: 10–3000 chars
 if (empty($message) || strlen($message) < 10)
     $errors[] = 'Message is required (min 10 characters).';
 if (strlen($message) > 3000)

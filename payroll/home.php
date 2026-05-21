@@ -388,20 +388,34 @@
             <!-- Contact Form -->
             <div class="contact-form-card">
                 <h3>Send a Message</h3>
-                <form class="contact-form" id="contactForm" onsubmit="handleContact(event)">
+                <form class="contact-form" id="contactForm" onsubmit="handleContact(event)" novalidate>
                     <!-- Honeypot — hidden from humans, catches bots -->
                     <input type="text" name="website" style="display:none;" tabindex="-1" autocomplete="off">
 
                     <div class="form-group">
-                        <label>Full Name</label>
-                        <input type="text" name="full_name" class="form-input"
-                               placeholder="Your full name" required minlength="2">
+                        <label>Full Name <span style="color:#C62828;">*</span></label>
+                        <input type="text" name="full_name" id="cf_name" class="form-input"
+                               placeholder="e.g. Admasu Dejene"
+                               required minlength="2" maxlength="100"
+                               oninput="validateName(this)">
+                        <span class="cf-hint" id="hint_name" style="font-size:0.78rem;color:#546E7A;margin-top:4px;display:block;">
+                            Letters and spaces only (min 2 characters)
+                        </span>
+                        <span class="cf-error" id="err_name" style="font-size:0.78rem;color:#C62828;margin-top:4px;display:none;"></span>
                     </div>
+
                     <div class="form-group">
-                        <label>Email Address</label>
-                        <input type="email" name="email" class="form-input"
-                               placeholder="your@email.com" required>
+                        <label>Email Address <span style="color:#C62828;">*</span></label>
+                        <input type="email" name="email" id="cf_email" class="form-input"
+                               placeholder="yourname@gmail.com"
+                               required maxlength="180"
+                               oninput="validateEmail(this)">
+                        <span class="cf-hint" id="hint_email" style="font-size:0.78rem;color:#546E7A;margin-top:4px;display:block;">
+                            Must be a valid Gmail address (e.g. name@gmail.com)
+                        </span>
+                        <span class="cf-error" id="err_email" style="font-size:0.78rem;color:#C62828;margin-top:4px;display:none;"></span>
                     </div>
+
                     <div class="form-group">
                         <label>Subject</label>
                         <select name="subject" class="form-input">
@@ -412,15 +426,24 @@
                             <option>Other</option>
                         </select>
                     </div>
+
                     <div class="form-group">
-                        <label>Message</label>
-                        <textarea name="message" class="form-input" rows="4"
-                                  placeholder="Your message..." required minlength="10"></textarea>
+                        <label>Message <span style="color:#C62828;">*</span></label>
+                        <textarea name="message" id="cf_message" class="form-input" rows="4"
+                                  placeholder="Your message (min 10 characters)..."
+                                  required minlength="10" maxlength="3000"
+                                  oninput="validateMessage(this)"></textarea>
+                        <span style="font-size:0.75rem;color:#90A4AE;float:right;margin-top:3px;">
+                            <span id="msgCount">0</span>/3000
+                        </span>
+                        <span class="cf-error" id="err_message" style="font-size:0.78rem;color:#C62828;margin-top:4px;display:none;"></span>
                     </div>
+
                     <div id="contactError" style="display:none;color:#C62828;font-size:0.85rem;
                          margin-bottom:12px;padding:10px 14px;background:#FFEBEE;
                          border-radius:8px;border-left:3px solid #C62828;">
                     </div>
+
                     <button type="submit" class="btn-contact-submit" id="contactSubmitBtn">
                         <i class="fas fa-paper-plane"></i> Send Message
                     </button>
@@ -561,32 +584,128 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
+// ---- Contact form validation helpers ----
+function showFieldError(errId, hintId, msg) {
+    const err  = document.getElementById(errId);
+    const hint = document.getElementById(hintId);
+    if (err)  { err.textContent = msg; err.style.display = msg ? 'block' : 'none'; }
+    if (hint) { hint.style.display = msg ? 'none' : 'block'; }
+}
+
+function setFieldState(inputEl, valid) {
+    inputEl.style.borderColor = valid ? '#2E7D32' : '#C62828';
+}
+
+function validateName(input) {
+    const val = input.value.trim();
+    if (val.length === 0) {
+        showFieldError('err_name', 'hint_name', '');
+        setFieldState(input, true);
+        return true;
+    }
+    if (!/^[\u0041-\u005A\u0061-\u007A\u00C0-\u024F\s'\-\.]+$/u.test(val)) {
+        showFieldError('err_name', 'hint_name', 'Name must contain letters only (no numbers or symbols).');
+        setFieldState(input, false);
+        return false;
+    }
+    if (val.length < 2) {
+        showFieldError('err_name', 'hint_name', 'Name must be at least 2 characters.');
+        setFieldState(input, false);
+        return false;
+    }
+    showFieldError('err_name', 'hint_name', '');
+    setFieldState(input, true);
+    return true;
+}
+
+function validateEmail(input) {
+    const val = input.value.trim();
+    if (val.length === 0) {
+        showFieldError('err_email', 'hint_email', '');
+        setFieldState(input, true);
+        return true;
+    }
+    // Must end with @gmail.com
+    if (!/^[a-zA-Z0-9._%+\-]+@gmail\.com$/i.test(val)) {
+        showFieldError('err_email', 'hint_email', 'Email must be a valid Gmail address ending with @gmail.com');
+        setFieldState(input, false);
+        return false;
+    }
+    showFieldError('err_email', 'hint_email', '');
+    setFieldState(input, true);
+    return true;
+}
+
+function validateMessage(input) {
+    const val = input.value;
+    const count = document.getElementById('msgCount');
+    if (count) count.textContent = val.length;
+    if (val.length > 0 && val.trim().length < 10) {
+        showFieldError('err_message', null, 'Message must be at least 10 characters.');
+        setFieldState(input, false);
+        return false;
+    }
+    showFieldError('err_message', null, '');
+    setFieldState(input, val.length > 0);
+    return true;
+}
+
 // ---- Contact form — real fetch submission ----
 async function handleContact(e) {
     e.preventDefault();
 
-    const form      = document.getElementById('contactForm');
-    const btn       = document.getElementById('contactSubmitBtn');
-    const errorBox  = document.getElementById('contactError');
-    const successBox= document.getElementById('contactSuccess');
+    const form       = document.getElementById('contactForm');
+    const btn        = document.getElementById('contactSubmitBtn');
+    const errorBox   = document.getElementById('contactError');
+    const successBox = document.getElementById('contactSuccess');
 
-    // Reset state
+    // Run all validations
+    const nameInput    = document.getElementById('cf_name');
+    const emailInput   = document.getElementById('cf_email');
+    const msgInput     = document.getElementById('cf_message');
+
+    const nameOk  = validateName(nameInput);
+    const emailOk = validateEmail(emailInput);
+    const msgOk   = validateMessage(msgInput);
+
+    // Extra: check required fields not empty
+    let hasError = false;
+    if (!nameInput.value.trim()) {
+        showFieldError('err_name', 'hint_name', 'Full name is required.');
+        setFieldState(nameInput, false);
+        hasError = true;
+    }
+    if (!emailInput.value.trim()) {
+        showFieldError('err_email', 'hint_email', 'Email address is required.');
+        setFieldState(emailInput, false);
+        hasError = true;
+    }
+    if (!msgInput.value.trim()) {
+        showFieldError('err_message', null, 'Message is required.');
+        setFieldState(msgInput, false);
+        hasError = true;
+    }
+
+    if (!nameOk || !emailOk || !msgOk || hasError) {
+        errorBox.textContent   = 'Please fix the errors above before sending.';
+        errorBox.style.display = 'block';
+        return;
+    }
+
     errorBox.style.display = 'none';
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
 
     try {
         const formData = new FormData(form);
-
-        // Determine API path relative to current page location
-        const base = window.location.pathname.replace(/\/[^/]*$/, '');
-        const apiUrl = base + '/api/contact.php';
+        const base     = window.location.pathname.replace(/\/[^/]*$/, '');
+        const apiUrl   = base + '/api/contact.php';
 
         const res  = await fetch(apiUrl, { method: 'POST', body: formData });
         const data = await res.json();
 
         if (data.success) {
-            form.style.display   = 'none';
+            form.style.display       = 'none';
             successBox.style.display = 'flex';
         } else {
             errorBox.textContent    = data.message || 'Something went wrong. Please try again.';

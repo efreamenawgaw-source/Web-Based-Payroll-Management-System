@@ -116,26 +116,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_employee'])) {
     }
 }
 
-// ── Handle DELETE ──────────────────────────────────────────
+// ── Handle SOFT DELETE (terminate) ────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_employee'])) {
     $del_id = trim($_POST['del_emp_id'] ?? '');
     if ($del_id) {
         try {
-            // Soft-delete: set status to terminated
             $pdo->prepare("UPDATE employees SET status = 'terminated' WHERE emp_id = ?")
                 ->execute([$del_id]);
 
-            $log = $pdo->prepare("
-                INSERT INTO audit_logs (user_id, username, role, action, target, ip_address)
-                VALUES (?, ?, ?, 'Terminate Employee', ?, ?)
-            ");
-            $log->execute([
+            $pdo->prepare("
+                INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
+                VALUES (?, ?, ?, 'Terminate Employee', ?, 'Status set to terminated', ?)
+            ")->execute([
                 $_SESSION['user_id'], $_SESSION['username'],
                 $_SESSION['role'], $del_id, $_SERVER['REMOTE_ADDR'] ?? null
             ]);
-            $success = "Employee <strong>{$del_id}</strong> has been terminated.";
+            $success = "Employee <strong>" . htmlspecialchars($del_id) . "</strong> has been terminated.";
         } catch (PDOException $e) {
             $error = 'Operation failed: ' . $e->getMessage();
+        }
+    }
+}
+
+// ── Handle PERMANENT DELETE ────────────────────────────────
+// Only allowed for terminated employees — irreversible
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['permanent_delete'])) {
+    $del_id    = trim($_POST['perm_del_emp_id'] ?? '');
+    $del_name  = trim($_POST['perm_del_name']   ?? '');
+    $confirmed = trim($_POST['confirm_name']    ?? '');
+
+    if (empty($del_id)) {
+        $error = 'No employee selected for deletion.';
+    } elseif ($confirmed !== $del_name) {
+        $error = 'Name confirmation did not match. Deletion cancelled.';
+    } else {
+        // Verify the employee is terminated before allowing permanent delete
+        $chk = $pdo->prepare("SELECT emp_id, full_name, status FROM employees WHERE emp_id = ?");
+        $chk->execute([$del_id]);
+        $emp_row = $chk->fetch();
+
+        if (!$emp_row) {
+            $error = 'Employee not found.';
+        } elseif ($emp_row['status'] !== 'terminated') {
+            $error = 'Only terminated employees can be permanently deleted. Please terminate first.';
+        } else {
+            try {
+                $pdo->beginTransaction();
+
+                // Delete related records first (FK order)
+                foreach ([
+                    "DELETE FROM payslips          WHERE emp_id = ?",
+                    "DELETE FROM deductions         WHERE emp_id = ?",
+                    "DELETE FROM allowances         WHERE emp_id = ?",
+                    "DELETE FROM working_days       WHERE emp_id = ?",
+                    "DELETE FROM employee_status_history WHERE emp_id = ?",
+                    "DELETE FROM payroll_records    WHERE emp_id = ?",
+                    "DELETE FROM employees          WHERE emp_id = ?",
+                ] as $sql) {
+                    $pdo->prepare($sql)->execute([$del_id]);
+                }
+
+                // Audit log
+                $pdo->prepare("
+                    INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
+                    VALUES (?, ?, ?, 'Permanent Delete Employee', ?, ?, ?)
+                ")->execute([
+                    $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
+                    $del_id,
+                    "Permanently deleted: {$emp_row['full_name']} ({$del_id})",
+                    $_SERVER['REMOTE_ADDR'] ?? null
+                ]);
+
+                $pdo->commit();
+                $success = "Employee <strong>" . htmlspecialchars($emp_row['full_name'])
+                         . "</strong> ({$del_id}) has been permanently deleted from the system.";
+            } catch (PDOException $e) {
+                $pdo->rollBack();
+                $error = 'Permanent delete failed: ' . $e->getMessage();
+            }
         }
     }
 }
@@ -374,6 +432,16 @@ require_once $depth . 'includes/header.php';
                                 </button>
                             </form>
                             <?php endif; ?>
+                            <!-- Permanent delete — only for terminated employees -->
+                            <?php if ($e['status'] === 'terminated'): ?>
+                            <button type="button"
+                                    onclick="openPermDelete('<?= htmlspecialchars(addslashes($e['emp_id'])) ?>','<?= htmlspecialchars(addslashes($e['full_name'])) ?>')"
+                                    class="btn btn-danger btn-sm btn-icon-only"
+                                    title="Permanently Delete Record"
+                                    style="background:var(--danger);border-color:var(--danger);">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -538,5 +606,86 @@ require_once $depth . 'includes/header.php';
     </div>
 </div>
 <?php endif; ?>
+
+<!-- ── Permanent Delete Confirmation Modal ── -->
+<div class="modal-overlay" id="permDeleteModal">
+    <div class="modal" style="max-width:480px;">
+        <div class="modal-header" style="background:var(--danger-light);border-bottom:2px solid var(--danger);">
+            <h3 style="color:var(--danger);">
+                <i class="fas fa-exclamation-triangle"></i>
+                Permanently Delete Employee
+            </h3>
+            <button class="modal-close" onclick="closePermDelete()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="alert alert-danger" style="margin-bottom:16px;">
+                <i class="fas fa-skull-crossbones"></i>
+                <div>
+                    <strong>This action is irreversible.</strong><br>
+                    All records for this employee will be permanently deleted including
+                    payslips, allowances, deductions, working days, and payroll history.
+                </div>
+            </div>
+
+            <p style="font-size:0.9rem;color:var(--gray-600);margin-bottom:16px;">
+                To confirm, type the employee's full name exactly as shown:
+            </p>
+
+            <div style="background:var(--gray-100);border-radius:var(--radius);
+                        padding:10px 14px;margin-bottom:16px;font-family:monospace;
+                        font-weight:700;font-size:1rem;color:var(--danger);
+                        border:1px solid var(--gray-200);">
+                <span id="permDelNameDisplay"></span>
+            </div>
+
+            <form method="POST" action="employees.php" id="permDeleteForm">
+                <input type="hidden" name="perm_del_emp_id" id="permDelEmpId">
+                <input type="hidden" name="perm_del_name"   id="permDelName">
+
+                <div class="form-group">
+                    <label class="form-label">
+                        Type employee name to confirm <span style="color:var(--danger)">*</span>
+                    </label>
+                    <input type="text" name="confirm_name" id="confirmNameInput"
+                           class="form-control"
+                           placeholder="Type the name exactly..."
+                           autocomplete="off"
+                           oninput="checkConfirm(this.value)">
+                </div>
+
+                <div class="modal-footer" style="padding:0;border:none;margin-top:8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closePermDelete()">
+                        Cancel
+                    </button>
+                    <button type="submit" name="permanent_delete" id="permDelBtn"
+                            class="btn btn-danger" disabled>
+                        <i class="fas fa-trash-alt"></i> Permanently Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openPermDelete(empId, empName) {
+    document.getElementById('permDelEmpId').value      = empId;
+    document.getElementById('permDelName').value       = empName;
+    document.getElementById('permDelNameDisplay').textContent = empName;
+    document.getElementById('confirmNameInput').value  = '';
+    document.getElementById('permDelBtn').disabled     = true;
+    document.getElementById('permDeleteModal').classList.add('active');
+    setTimeout(() => document.getElementById('confirmNameInput').focus(), 100);
+}
+
+function closePermDelete() {
+    document.getElementById('permDeleteModal').classList.remove('active');
+}
+
+function checkConfirm(val) {
+    const expected = document.getElementById('permDelName').value;
+    document.getElementById('permDelBtn').disabled = (val !== expected);
+}
+</script>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
