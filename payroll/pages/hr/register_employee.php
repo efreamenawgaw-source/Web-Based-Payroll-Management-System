@@ -6,161 +6,196 @@ $depth      = '../../';
 require_once $depth . 'database/db_connect.php';
 require_once $depth . 'includes/notify.php';
 
-$pdo     = getDB();
-$success = '';
-$error   = '';
-$post    = [];   // repopulate form on error
+// ============================================================
+// EmployeeRegistration — OOP class
+// Handles ID generation, validation, and DB insertion
+// ============================================================
+class EmployeeRegistration
+{
+    private PDO $pdo;
 
-// â”€â”€ Load departments from DB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-$departments = $pdo->query("
-    SELECT dept_id, dept_name FROM departments
-    WHERE  is_active = 1
-    ORDER  BY dept_name
-")->fetchAll();
-
-// â”€â”€ Handle form submission â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $post = $_POST;
-
-    // Sanitise inputs
-    $emp_id             = strtoupper(trim($post['emp_id']             ?? ''));
-    $full_name          = trim($post['full_name']                     ?? '');
-    $last_name          = trim($post['last_name']                     ?? '') ?: null;
-    $cbe_account_number = trim($post['cbe_account_number']            ?? '') ?: null;
-    $cbe_account_name   = trim($post['cbe_account_name']              ?? '') ?: null;
-    $gender             = trim($post['gender']                        ?? '');
-    $dob             = trim($post['dob']                        ?? '') ?: null;
-    $email           = trim($post['email']                      ?? '') ?: null;
-    $phone           = trim($post['phone']                      ?? '');
-    $dept_id         = (int)($post['dept_id']                   ?? 0);
-    $position        = trim($post['position']                   ?? '');
-    $basic_salary    = (float)($post['basic_salary']            ?? 0);
-    $employment_date = trim($post['employment_date']            ?? '');
-    $emp_type        = trim($post['emp_type']                   ?? 'permanent');
-    $status          = trim($post['status']                     ?? 'active');
-    $housing         = (float)($post['housing']                 ?? 0);
-    $transport       = (float)($post['transport']               ?? 0);
-    $position_allow  = (float)($post['position_allowance']      ?? 0);
-    $teaching        = (float)($post['teaching']                ?? 0);
-    $other           = (float)($post['other']                   ?? 0);
-
-    // ── Whitelists ─────────────────────────────────────────
-    $valid_positions = [
-        'Professor','Associate Professor','Senior Lecturer','Lecturer',
-        'Assistant Lecturer','Administrative Officer','HR Officer',
-        'Finance Officer','Technician','Librarian','Security Staff',
-        'IT Officer','Cleaner','Driver',
+    // ── Whitelists ───────────────────────────────────────────
+    private const VALID_POSITIONS = [
+        'Professor', 'Associate Professor', 'Senior Lecturer', 'Lecturer',
+        'Assistant Lecturer', 'Administrative Officer', 'HR Officer',
+        'Finance Officer', 'Technician', 'Librarian', 'Security Staff',
+        'IT Officer', 'Cleaner', 'Driver',
     ];
-    $valid_emp_types = ['permanent','contract','part_time'];
-    $valid_statuses  = ['active','on_leave'];
-    $valid_genders   = ['male','female','other'];
+    private const VALID_EMP_TYPES = ['permanent', 'contract', 'part_time'];
+    private const VALID_STATUSES  = ['active', 'on_leave'];
+    private const VALID_GENDERS   = ['male', 'female', 'other'];
+    private const EMP_ID_PREFIX   = 'BIT';
 
-    // ── Validation ─────────────────────────────────────────
-    $errors = [];
-
-    // Employee ID: required, alphanumeric + hyphen, 3-20 chars
-    if (empty($emp_id))
-        $errors[] = 'Employee ID is required.';
-    elseif (!preg_match('/^[A-Z0-9\-]{3,20}$/', $emp_id))
-        $errors[] = 'Employee ID must be 3–20 characters (letters, numbers, hyphens only).';
-
-    // Full name: required, letters/spaces/hyphens, 2-100 chars
-    if (empty($full_name))
-        $errors[] = 'Full name is required.';
-    elseif (strlen($full_name) < 2 || strlen($full_name) > 100)
-        $errors[] = 'Full name must be 2–100 characters.';
-    elseif (!preg_match('/^[\p{L}\s\'\-\.]+$/u', $full_name))
-        $errors[] = 'Full name may only contain letters, spaces, hyphens, apostrophes, and dots.';
-
-    // Last name: optional, same rules if provided
-    if ($last_name !== null && strlen($last_name) > 100)
-        $errors[] = 'Last name must be 100 characters or fewer.';
-
-    // Gender: whitelist
-    if (!in_array($gender, $valid_genders, true))
-        $errors[] = 'Please select a valid gender.';
-
-    // Phone: required, Ethiopian format (+251 or 09/07 prefix), 9-15 digits
-    if (empty($phone))
-        $errors[] = 'Phone number is required.';
-    elseif (!preg_match('/^(\+251|0)[0-9]{8,13}$/', preg_replace('/[\s\-]/', '', $phone)))
-        $errors[] = 'Phone must be a valid Ethiopian number (e.g. +251911234567 or 0911234567).';
-
-    // Email: optional but must be valid if provided
-    if ($email !== null) {
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL))
-            $errors[] = 'Please enter a valid email address.';
-        elseif (strlen($email) > 180)
-            $errors[] = 'Email address is too long (max 180 characters).';
+    public function __construct(PDO $pdo)
+    {
+        $this->pdo = $pdo;
     }
 
-    // Department: must exist in DB
-    if ($dept_id === 0)
-        $errors[] = 'Department is required.';
+    // ── Generate next BIT-XXXX employee ID ──────────────────
+    public function generateNextEmpId(): string
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT emp_id FROM employees
+            WHERE emp_id LIKE 'BIT-%'
+            ORDER BY CAST(SUBSTRING(emp_id, 5) AS UNSIGNED) DESC
+            LIMIT 1
+        ");
+        $stmt->execute();
+        $last = $stmt->fetchColumn();
 
-    // Position: whitelist
-    if (!in_array($position, $valid_positions, true))
-        $errors[] = 'Please select a valid position.';
+        if ($last) {
+            // Extract numeric part and increment
+            $num = (int) substr($last, 4); // strip 'BIT-'
+            $next = $num + 1;
+        } else {
+            $next = 1;
+        }
 
-    // Basic salary: positive, reasonable range
-    if ($basic_salary <= 0)
-        $errors[] = 'Basic salary must be greater than 0.';
-    elseif ($basic_salary > 500000)
-        $errors[] = 'Basic salary seems too high. Please verify.';
-
-    // Employment date: required, not in the future, not before 1990
-    if (empty($employment_date))
-        $errors[] = 'Employment date is required.';
-    elseif (strtotime($employment_date) > strtotime('today'))
-        $errors[] = 'Employment date cannot be in the future.';
-    elseif (strtotime($employment_date) < strtotime('1990-01-01'))
-        $errors[] = 'Employment date seems too far in the past.';
-
-    // Date of birth: optional, must be in the past, age 18–80
-    if ($dob !== null) {
-        $age = (int)date_diff(date_create($dob), date_create('today'))->y;
-        if (strtotime($dob) >= strtotime('today'))
-            $errors[] = 'Date of birth must be in the past.';
-        elseif ($age < 18 || $age > 80)
-            $errors[] = 'Employee age must be between 18 and 80 years.';
+        return self::EMP_ID_PREFIX . '-' . str_pad($next, 4, '0', STR_PAD_LEFT);
     }
 
-    // Employment type: whitelist
-    if (!in_array($emp_type, $valid_emp_types, true))
-        $errors[] = 'Please select a valid employment type.';
-
-    // Status: whitelist
-    if (!in_array($status, $valid_statuses, true))
-        $errors[] = 'Please select a valid status.';
-
-    // CBE account number: optional, digits only, 10-20 chars
-    if ($cbe_account_number !== null) {
-        if (!preg_match('/^[0-9]{10,20}$/', $cbe_account_number))
-            $errors[] = 'CBE account number must be 10–20 digits only.';
+    // ── Load active departments ──────────────────────────────
+    public function getDepartments(): array
+    {
+        return $this->pdo->query("
+            SELECT dept_id, dept_name FROM departments
+            WHERE  is_active = 1
+            ORDER  BY dept_name
+        ")->fetchAll();
     }
 
-    // Allowances: non-negative
-    foreach (['housing' => $housing, 'transport' => $transport,
-              'position_allowance' => $position_allow,
-              'teaching' => $teaching, 'other' => $other] as $fname => $fval) {
-        if ($fval < 0)
-            $errors[] = ucwords(str_replace('_', ' ', $fname)) . ' cannot be negative.';
+    // ── Validate form input, return array of error strings ──
+    public function validate(array $data): array
+    {
+        $errors = [];
+
+        $full_name          = trim($data['full_name']          ?? '');
+        $last_name          = trim($data['last_name']          ?? '') ?: null;
+        $cbe_account_number = trim($data['cbe_account_number'] ?? '') ?: null;
+        $gender             = trim($data['gender']             ?? '');
+        $dob                = trim($data['dob']                ?? '') ?: null;
+        $email              = trim($data['email']              ?? '') ?: null;
+        $phone              = trim($data['phone']              ?? '');
+        $dept_id            = (int)($data['dept_id']           ?? 0);
+        $position           = trim($data['position']           ?? '');
+        $basic_salary       = (float)($data['basic_salary']    ?? 0);
+        $employment_date    = trim($data['employment_date']    ?? '');
+        $emp_type           = trim($data['emp_type']           ?? 'permanent');
+        $status             = trim($data['status']             ?? 'active');
+
+        // Allowances
+        foreach (['housing', 'transport', 'position_allowance', 'teaching', 'other'] as $f) {
+            if ((float)($data[$f] ?? 0) < 0)
+                $errors[] = ucwords(str_replace('_', ' ', $f)) . ' cannot be negative.';
+        }
+
+        // Full name
+        if (empty($full_name))
+            $errors[] = 'Full name is required.';
+        elseif (strlen($full_name) < 2 || strlen($full_name) > 100)
+            $errors[] = 'Full name must be 2–100 characters.';
+        elseif (!preg_match('/^[\p{L}\s\'\-\.]+$/u', $full_name))
+            $errors[] = 'Full name may only contain letters, spaces, hyphens, apostrophes, and dots.';
+
+        // Last name (optional)
+        if ($last_name !== null && strlen($last_name) > 100)
+            $errors[] = 'Last name must be 100 characters or fewer.';
+
+        // Gender
+        if (!in_array($gender, self::VALID_GENDERS, true))
+            $errors[] = 'Please select a valid gender.';
+
+        // Phone
+        if (empty($phone))
+            $errors[] = 'Phone number is required.';
+        elseif (!preg_match('/^(\+251|0)[0-9]{8,13}$/', preg_replace('/[\s\-]/', '', $phone)))
+            $errors[] = 'Phone must be a valid Ethiopian number (e.g. +251911234567 or 0911234567).';
+
+        // Email (optional)
+        if ($email !== null) {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL))
+                $errors[] = 'Please enter a valid email address.';
+            elseif (strlen($email) > 180)
+                $errors[] = 'Email address is too long (max 180 characters).';
+        }
+
+        // Department
+        if ($dept_id === 0)
+            $errors[] = 'Department is required.';
+
+        // Position
+        if (!in_array($position, self::VALID_POSITIONS, true))
+            $errors[] = 'Please select a valid position.';
+
+        // Basic salary
+        if ($basic_salary <= 0)
+            $errors[] = 'Basic salary must be greater than 0.';
+        elseif ($basic_salary > 500000)
+            $errors[] = 'Basic salary seems too high. Please verify.';
+
+        // Employment date
+        if (empty($employment_date))
+            $errors[] = 'Employment date is required.';
+        elseif (strtotime($employment_date) > strtotime('today'))
+            $errors[] = 'Employment date cannot be in the future.';
+        elseif (strtotime($employment_date) < strtotime('1990-01-01'))
+            $errors[] = 'Employment date seems too far in the past.';
+
+        // Date of birth (optional)
+        if ($dob !== null) {
+            $age = (int) date_diff(date_create($dob), date_create('today'))->y;
+            if (strtotime($dob) >= strtotime('today'))
+                $errors[] = 'Date of birth must be in the past.';
+            elseif ($age < 18 || $age > 80)
+                $errors[] = 'Employee age must be between 18 and 80 years.';
+        }
+
+        // Employment type
+        if (!in_array($emp_type, self::VALID_EMP_TYPES, true))
+            $errors[] = 'Please select a valid employment type.';
+
+        // Status
+        if (!in_array($status, self::VALID_STATUSES, true))
+            $errors[] = 'Please select a valid status.';
+
+        // CBE account number (optional)
+        if ($cbe_account_number !== null) {
+            if (!preg_match('/^[0-9]{10,20}$/', $cbe_account_number))
+                $errors[] = 'CBE account number must be 10–20 digits only.';
+        }
+
+        return $errors;
     }
 
-    // Check duplicate emp_id
-    if (empty($errors)) {
-        $chk = $pdo->prepare("SELECT emp_id FROM employees WHERE emp_id = ?");
-        $chk->execute([$emp_id]);
-        if ($chk->fetch())
-            $errors[] = 'Employee ID <strong>' . htmlspecialchars($emp_id) . '</strong> already exists.';
-    }
+    // ── Register employee — returns emp_id on success ───────
+    public function register(array $data, int $createdBy): string
+    {
+        $emp_id             = $this->generateNextEmpId();
+        $full_name          = trim($data['full_name']);
+        $last_name          = trim($data['last_name']          ?? '') ?: null;
+        $cbe_account_number = trim($data['cbe_account_number'] ?? '') ?: null;
+        $cbe_account_name   = trim($data['cbe_account_name']   ?? '') ?: null;
+        $gender             = trim($data['gender']);
+        $dob                = trim($data['dob']                ?? '') ?: null;
+        $email              = trim($data['email']              ?? '') ?: null;
+        $phone              = trim($data['phone']);
+        $dept_id            = (int)$data['dept_id'];
+        $position           = trim($data['position']);
+        $basic_salary       = (float)$data['basic_salary'];
+        $employment_date    = trim($data['employment_date']);
+        $emp_type           = trim($data['emp_type']           ?? 'permanent');
+        $status             = trim($data['status']             ?? 'active');
+        $housing            = (float)($data['housing']             ?? 0);
+        $transport          = (float)($data['transport']           ?? 0);
+        $position_allow     = (float)($data['position_allowance']  ?? 0);
+        $teaching           = (float)($data['teaching']            ?? 0);
+        $other              = (float)($data['other']               ?? 0);
 
-    if (empty($errors)) {
+        $this->pdo->beginTransaction();
+
         try {
-            $pdo->beginTransaction();
-
             // Insert employee
-            $stmt = $pdo->prepare("
+            $stmt = $this->pdo->prepare("
                 INSERT INTO employees
                     (emp_id, full_name, last_name, cbe_account_number, cbe_account_name,
                      gender, date_of_birth, phone, email,
@@ -173,11 +208,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $emp_id, $full_name, $last_name, $cbe_account_number, $cbe_account_name,
                 $gender, $dob, $phone, $email,
                 $dept_id, $position, $emp_type, $basic_salary,
-                $employment_date, $status, $_SESSION['user_id']
+                $employment_date, $status, $createdBy,
             ]);
 
             // Insert initial allowances
-            $allow = $pdo->prepare("
+            $allow = $this->pdo->prepare("
                 INSERT INTO allowances
                     (emp_id, housing, transport, position_allowance,
                      teaching, other, effective_from, updated_by)
@@ -185,12 +220,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $allow->execute([
                 $emp_id, $housing, $transport, $position_allow,
-                $teaching, $other, $employment_date, $_SESSION['user_id']
+                $teaching, $other, $employment_date, $createdBy,
             ]);
 
             // Audit log
-            $log = $pdo->prepare("
-                INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
+            $log = $this->pdo->prepare("
+                INSERT INTO audit_logs
+                    (user_id, username, role, action, target, details, ip_address)
                 VALUES (?, ?, ?, 'Register Employee', ?, ?, ?)
             ");
             $log->execute([
@@ -199,26 +235,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['role'],
                 $emp_id,
                 "Registered: {$full_name} | Dept ID: {$dept_id} | Salary: {$basic_salary}",
-                $_SERVER['REMOTE_ADDR'] ?? null
+                $_SERVER['REMOTE_ADDR'] ?? null,
             ]);
 
-            $pdo->commit();
-            $success = "Employee <strong>{$full_name}</strong> ({$emp_id}) registered successfully!";
+            $this->pdo->commit();
+            return $emp_id;
+
+        } catch (PDOException $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    // ── Expose position list for the view ───────────────────
+    public function getPositions(): array
+    {
+        return self::VALID_POSITIONS;
+    }
+}
+
+// ============================================================
+// Controller logic
+// ============================================================
+$pdo        = getDB();
+$service    = new EmployeeRegistration($pdo);
+$departments = $service->getDepartments();
+$nextEmpId  = $service->generateNextEmpId();
+
+$success = '';
+$error   = '';
+$post    = [];   // repopulate form on error
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $post   = $_POST;
+    $errors = $service->validate($post);
+
+    if (empty($errors)) {
+        try {
+            $emp_id   = $service->register($post, (int)$_SESSION['user_id']);
+            $fullName = htmlspecialchars(trim($post['full_name']));
+            $success  = "Employee <strong>{$fullName}</strong> registered with ID <strong>{$emp_id}</strong> successfully!";
 
             // Notify admin and finance
             notify_role($pdo, 'admin',
                 'New Employee Registered',
-                "HR registered new employee: {$full_name} ({$emp_id})",
+                "HR registered new employee: {$fullName} ({$emp_id})",
                 'success');
             notify_role($pdo, 'finance',
                 'New Employee Added',
-                "{$full_name} ({$emp_id}) has been registered. Update allowances and deductions before payroll.",
+                "{$fullName} ({$emp_id}) has been registered. Update allowances and deductions before payroll.",
                 'info');
 
-            $post = [];
+            // Refresh next ID for a new blank form
+            $nextEmpId = $service->generateNextEmpId();
+            $post      = [];
 
         } catch (PDOException $e) {
-            $pdo->rollBack();
             $error = 'Database error: ' . $e->getMessage();
         }
     } else {
@@ -261,12 +333,29 @@ require_once $depth . 'includes/header.php';
 <form method="POST" action="" novalidate>
 <div class="grid-2" style="gap:24px;align-items:start;">
 
-    <!-- â”€â”€ Personal Information â”€â”€ -->
+    <!-- ── Personal Information ── -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-user" style="color:var(--primary);margin-right:8px"></i>Personal Information</h3>
         </div>
         <div class="card-body">
+
+            <!-- Auto-generated Employee ID (read-only) -->
+            <div class="form-group">
+                <label class="form-label">Employee ID</label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <input type="text" class="form-control"
+                           value="<?= htmlspecialchars($nextEmpId) ?>"
+                           readonly
+                           style="background:var(--gray-100);color:var(--primary);
+                                  font-weight:700;letter-spacing:1px;cursor:default;">
+                </div>
+                <span class="form-hint">
+                    <i class="fas fa-magic" style="color:var(--primary)"></i>
+                    Auto-assigned — next available ID in the <strong>BIT-XXXX</strong> sequence
+                </span>
+            </div>
+
             <div class="form-group">
                 <label class="form-label">Full Name <span style="color:var(--danger)">*</span></label>
                 <input type="text" name="full_name" class="form-control"
@@ -308,15 +397,7 @@ require_once $depth . 'includes/header.php';
                 </div>
             </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Employee ID <span style="color:var(--danger)">*</span></label>
-                    <input type="text" name="emp_id" class="form-control"
-                           placeholder="e.g. EMP-101"
-                           value="<?= htmlspecialchars($post['emp_id'] ?? '') ?>"
-                           style="text-transform:uppercase" required>
-                    <span class="form-hint">Must be unique &mdash; e.g. EMP-101</span>
-                </div>
+            <div class="form-row" style="margin-top:12px;">
                 <div class="form-group">
                     <label class="form-label">Gender <span style="color:var(--danger)">*</span></label>
                     <select name="gender" class="form-control" required>
@@ -325,6 +406,11 @@ require_once $depth . 'includes/header.php';
                         <option value="female" <?= ($post['gender'] ?? '') === 'female' ? 'selected' : '' ?>>Female</option>
                         <option value="other"  <?= ($post['gender'] ?? '') === 'other'  ? 'selected' : '' ?>>Other</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date of Birth</label>
+                    <input type="date" name="dob" class="form-control"
+                           value="<?= htmlspecialchars($post['dob'] ?? '') ?>">
                 </div>
             </div>
 
@@ -342,15 +428,10 @@ require_once $depth . 'includes/header.php';
                        value="<?= htmlspecialchars($post['phone'] ?? '') ?>" required>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">Date of Birth</label>
-                <input type="date" name="dob" class="form-control"
-                       value="<?= htmlspecialchars($post['dob'] ?? '') ?>">
-            </div>
         </div>
     </div>
 
-    <!-- â”€â”€ Employment Information â”€â”€ -->
+    <!-- ── Employment Information ── -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-briefcase" style="color:var(--primary);margin-right:8px"></i>Employment Information</h3>
@@ -373,14 +454,7 @@ require_once $depth . 'includes/header.php';
                 <label class="form-label">Position / Job Title <span style="color:var(--danger)">*</span></label>
                 <select name="position" class="form-control" required>
                     <option value="">Select Position</option>
-                    <?php
-                    $positions = [
-                        'Professor','Associate Professor','Senior Lecturer','Lecturer',
-                        'Assistant Lecturer','Administrative Officer','HR Officer',
-                        'Finance Officer','Technician','Librarian','Security Staff',
-                        'IT Officer','Cleaner','Driver',
-                    ];
-                    foreach ($positions as $p): ?>
+                    <?php foreach ($service->getPositions() as $p): ?>
                     <option value="<?= $p ?>"
                         <?= ($post['position'] ?? '') === $p ? 'selected' : '' ?>>
                         <?= $p ?>
@@ -415,7 +489,7 @@ require_once $depth . 'includes/header.php';
                 <div class="form-group">
                     <label class="form-label">Initial Status</label>
                     <select name="status" class="form-control">
-                        <option value="active" <?= ($post['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>Active</option>
+                        <option value="active"   <?= ($post['status'] ?? 'active') === 'active'   ? 'selected' : '' ?>>Active</option>
                         <option value="on_leave" <?= ($post['status'] ?? '') === 'on_leave' ? 'selected' : '' ?>>On Leave</option>
                     </select>
                 </div>
@@ -425,7 +499,7 @@ require_once $depth . 'includes/header.php';
 
 </div>
 
-<!-- â”€â”€ Allowances â”€â”€ -->
+<!-- ── Allowances ── -->
 <div class="card mt-3">
     <div class="card-header">
         <h3><i class="fas fa-hand-holding-usd" style="color:var(--success);margin-right:8px"></i>
@@ -478,7 +552,7 @@ require_once $depth . 'includes/header.php';
     </div>
 </div>
 
-<!-- â”€â”€ Actions â”€â”€ -->
+<!-- ── Actions ── -->
 <div class="card mt-3">
     <div class="card-body d-flex gap-2" style="justify-content:flex-end;flex-wrap:wrap;">
         <a href="employees.php" class="btn btn-secondary">
@@ -498,23 +572,22 @@ require_once $depth . 'includes/header.php';
 <script>
 // Live gross salary preview
 function updateGross() {
-    const basic     = parseFloat(document.querySelector('[name=basic_salary]')?.value)     || 0;
-    const housing   = parseFloat(document.querySelector('[name=housing]')?.value)          || 0;
-    const transport = parseFloat(document.querySelector('[name=transport]')?.value)        || 0;
-    const position  = parseFloat(document.querySelector('[name=position_allowance]')?.value) || 0;
-    const teaching  = parseFloat(document.querySelector('[name=teaching]')?.value)         || 0;
-    const other     = parseFloat(document.querySelector('[name=other]')?.value)            || 0;
+    const basic     = parseFloat(document.querySelector('[name=basic_salary]')?.value)        || 0;
+    const housing   = parseFloat(document.querySelector('[name=housing]')?.value)             || 0;
+    const transport = parseFloat(document.querySelector('[name=transport]')?.value)           || 0;
+    const position  = parseFloat(document.querySelector('[name=position_allowance]')?.value)  || 0;
+    const teaching  = parseFloat(document.querySelector('[name=teaching]')?.value)            || 0;
+    const other     = parseFloat(document.querySelector('[name=other]')?.value)               || 0;
 
     const allowances = housing + transport + position + teaching + other;
     const gross      = basic + allowances;
 
     document.getElementById('grossAmount').textContent =
-        'ETB ' + gross.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        'ETB ' + gross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     document.getElementById('grossBreakdown').textContent =
         'Basic (' + basic.toLocaleString() + ') + Allowances (' + allowances.toLocaleString() + ')';
 }
 
-// Attach listeners
 document.querySelectorAll('[name=basic_salary],[name=housing],[name=transport],[name=position_allowance],[name=teaching],[name=other]')
     .forEach(el => el.addEventListener('input', updateGross));
 
@@ -522,4 +595,3 @@ updateGross();
 </script>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
-
