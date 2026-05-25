@@ -13,7 +13,7 @@ $error   = '';
 // ── SAVE email settings ────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_email'])) {
     $settings = [
-        'mail_host'      => 'smtp.gmail.com',
+        'mail_host'      => trim($_POST['mail_host']      ?? 'smtp.gmail.com'),
         'mail_port'      => trim($_POST['mail_port']      ?? '587'),
         'mail_username'  => trim($_POST['mail_username']  ?? ''),
         'mail_password'  => trim($_POST['mail_password']  ?? ''),
@@ -93,14 +93,49 @@ require_once $depth . 'includes/header.php';
 <div class="alert alert-info mb-3">
     <i class="fas fa-info-circle"></i>
     <div>
-        <strong>How to set up Gmail SMTP:</strong>
-        <ol style="margin:8px 0 0 16px;font-size:0.85rem;line-height:1.8;">
-            <li>Go to <a href="https://myaccount.google.com/security" target="_blank">myaccount.google.com/security</a></li>
-            <li>Enable <strong>2-Step Verification</strong></li>
-            <li>Go to <strong>Security &rarr; App passwords</strong></li>
-            <li>Type an app name (e.g. <em>BiT Payroll</em>) &rarr; click <strong>Create</strong></li>
-            <li>Copy the 16-character password and paste it in the <strong>App Password</strong> field below</li>
-        </ol>
+        <strong>SMTP Provider Setup Guide:</strong>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:10px;">
+
+            <div style="background:white;border-radius:8px;padding:12px 14px;border-left:3px solid #1565C0;">
+                <p style="font-weight:700;font-size:0.85rem;color:#1565C0;margin:0 0 6px;">
+                    <i class="fab fa-google"></i> Gmail (smtp.gmail.com)
+                </p>
+                <ol style="margin:0 0 0 14px;font-size:0.8rem;line-height:1.8;color:#546E7A;">
+                    <li>Go to <a href="https://myaccount.google.com/security" target="_blank">myaccount.google.com/security</a></li>
+                    <li>Enable <strong>2-Step Verification</strong></li>
+                    <li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank">App Passwords</a></li>
+                    <li>Create app named <em>BiT Payroll</em> &rarr; copy 16-char password</li>
+                    <li>Use port <strong>587 (TLS)</strong> or <strong>465 (SSL)</strong></li>
+                </ol>
+            </div>
+
+            <div style="background:white;border-radius:8px;padding:12px 14px;border-left:3px solid #0078D4;">
+                <p style="font-weight:700;font-size:0.85rem;color:#0078D4;margin:0 0 6px;">
+                    <i class="fab fa-microsoft"></i> Outlook / Office 365
+                </p>
+                <ol style="margin:0 0 0 14px;font-size:0.8rem;line-height:1.8;color:#546E7A;">
+                    <li>Host: <strong>smtp.office365.com</strong></li>
+                    <li>Port: <strong>587</strong>, Encryption: <strong>STARTTLS</strong></li>
+                    <li>Username: your full Outlook email</li>
+                    <li>Password: your regular Outlook password</li>
+                    <li>No App Password needed</li>
+                </ol>
+            </div>
+
+            <div style="background:white;border-radius:8px;padding:12px 14px;border-left:3px solid #6C757D;">
+                <p style="font-weight:700;font-size:0.85rem;color:#6C757D;margin:0 0 6px;">
+                    <i class="fas fa-flask"></i> Ethereal (Free Testing)
+                </p>
+                <ol style="margin:0 0 0 14px;font-size:0.8rem;line-height:1.8;color:#546E7A;">
+                    <li>Go to <a href="https://ethereal.email" target="_blank">ethereal.email</a></li>
+                    <li>Click <strong>Create Ethereal Account</strong></li>
+                    <li>Copy the SMTP credentials shown</li>
+                    <li>Emails are <strong>not delivered</strong> &mdash; view them on the site</li>
+                    <li>Perfect for testing without a real email</li>
+                </ol>
+            </div>
+
+        </div>
     </div>
 </div>
 
@@ -117,23 +152,54 @@ require_once $depth . 'includes/header.php';
             <form method="POST" action="">
                 <div class="form-group">
                     <label class="form-label">SMTP Host</label>
-                    <input type="text" class="form-control" value="smtp.gmail.com"
-                           readonly style="background:var(--gray-100);">
-                    <span class="form-hint">Gmail SMTP host (fixed)</span>
+                    <select name="mail_host" class="form-control" id="smtpHostSelect"
+                            onchange="updatePortHint(this.value)">
+                        <option value="smtp.gmail.com"
+                            <?= ($current['mail_host'] ?? 'smtp.gmail.com') === 'smtp.gmail.com' ? 'selected' : '' ?>>
+                            Gmail — smtp.gmail.com
+                        </option>
+                        <option value="smtp.office365.com"
+                            <?= ($current['mail_host'] ?? '') === 'smtp.office365.com' ? 'selected' : '' ?>>
+                            Outlook / Office 365 — smtp.office365.com
+                        </option>
+                        <option value="smtp.mail.yahoo.com"
+                            <?= ($current['mail_host'] ?? '') === 'smtp.mail.yahoo.com' ? 'selected' : '' ?>>
+                            Yahoo Mail — smtp.mail.yahoo.com
+                        </option>
+                        <option value="smtp.ethereal.email"
+                            <?= ($current['mail_host'] ?? '') === 'smtp.ethereal.email' ? 'selected' : '' ?>>
+                            Ethereal (Testing only) — smtp.ethereal.email
+                        </option>
+                    </select>
+                    <span class="form-hint" id="hostHint">
+                        <?php
+                        $h = $current['mail_host'] ?? 'smtp.gmail.com';
+                        if ($h === 'smtp.office365.com') echo 'Use your Microsoft/Outlook email and password.';
+                        elseif ($h === 'smtp.mail.yahoo.com') echo 'Use your Yahoo email and an App Password.';
+                        elseif ($h === 'smtp.ethereal.email') echo 'Free fake SMTP for testing — emails are not actually delivered.';
+                        else echo 'Requires a Gmail App Password (not your regular password).';
+                        ?>
+                    </span>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">SMTP Port</label>
-                        <select name="mail_port" class="form-control">
+                        <select name="mail_port" class="form-control" id="smtpPortSelect">
                             <option value="587" <?= ($current['mail_port'] ?? '587') === '587' ? 'selected' : '' ?>>
-                                587 &mdash; TLS (recommended)
+                                587 — STARTTLS (recommended)
                             </option>
                             <option value="465" <?= ($current['mail_port'] ?? '') === '465' ? 'selected' : '' ?>>
-                                465 &mdash; SSL
+                                465 — SSL/SMTPS
+                            </option>
+                            <option value="25" <?= ($current['mail_port'] ?? '') === '25' ? 'selected' : '' ?>>
+                                25 — Plain (not recommended)
                             </option>
                         </select>
-                        <span class="form-hint">Use 465 if 587 is blocked by your network</span>
+                        <span class="form-hint">
+                            Try <strong>465 (SSL)</strong> if 587 is blocked by your network.
+                            Outlook/Office365 requires <strong>587</strong>.
+                        </span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">From Name</label>
@@ -238,8 +304,9 @@ require_once $depth . 'includes/header.php';
                            && !empty($current['mail_password']);
                 $rows = [
                     ['Status',     ($current['mail_enabled'] ?? '1') === '1' ? '&#x2705; Enabled' : '&#x26D4; Disabled'],
+                    ['Host',       htmlspecialchars($current['mail_host'] ?? 'smtp.gmail.com')],
                     ['Gmail',      !empty($current['mail_username']) ? htmlspecialchars($current['mail_username']) : '&#x26A0;&#xFE0F; Not set'],
-                    ['Port',       ($current['mail_port'] ?? '587') . ' (' . (($current['mail_port'] ?? '587') === '465' ? 'SSL' : 'TLS') . ')'],
+                    ['Port',       ($current['mail_port'] ?? '587') . ' (' . (($current['mail_port'] ?? '587') === '465' ? 'SSL' : 'STARTTLS') . ')'],
                     ['Password',   !empty($current['mail_password']) ? '&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;' : '&#x26A0;&#xFE0F; Not set'],
                     ['Ready',      $configured ? '&#x2705; Ready to send' : '&#x26A0;&#xFE0F; Incomplete setup'],
                 ];
@@ -299,6 +366,29 @@ function togglePass() {
         input.type = 'password';
         eye.className = 'fas fa-eye';
     }
+}
+
+// Update the host hint and recommended port when provider changes
+function updatePortHint(host) {
+    const hint = document.getElementById('hostHint');
+    const port = document.getElementById('smtpPortSelect');
+
+    const hints = {
+        'smtp.gmail.com':       'Requires a Gmail App Password (not your regular password).',
+        'smtp.office365.com':   'Use your Microsoft/Outlook email and regular password. Port 587 required.',
+        'smtp.mail.yahoo.com':  'Use your Yahoo email and an App Password from Yahoo Security settings.',
+        'smtp.ethereal.email':  'Free fake SMTP for testing — emails are NOT actually delivered.',
+    };
+
+    const ports = {
+        'smtp.gmail.com':       '587',
+        'smtp.office365.com':   '587',
+        'smtp.mail.yahoo.com':  '465',
+        'smtp.ethereal.email':  '587',
+    };
+
+    if (hint) hint.textContent = hints[host] ?? '';
+    if (port && ports[host]) port.value = ports[host];
 }
 </script>
 

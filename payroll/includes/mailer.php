@@ -73,18 +73,28 @@ function sendMail(string $to_email, string $to_name, string $subject, string $ht
 
     try {
         $mail->isSMTP();
-        $mail->Host       = $host;
-        $mail->SMTPAuth   = true;
-        $mail->Username   = $username;
-        $mail->Password   = $password;
-        // Port 465 uses SSL, port 587 uses STARTTLS
+        $mail->Host        = $host;
+        $mail->SMTPAuth    = true;
+        $mail->Username    = $username;
+        $mail->Password    = $password;
+        $mail->CharSet     = 'UTF-8';
+        $mail->Timeout     = 30;          // seconds before giving up
+        $mail->SMTPOptions = [            // allow self-signed certs (dev/local)
+            'ssl' => [
+                'verify_peer'       => false,
+                'verify_peer_name'  => false,
+                'allow_self_signed' => true,
+            ],
+        ];
+
+        // Port 465 → SSL (SMTPS), anything else → STARTTLS
         if ((int)$port === 465) {
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;   // SSL
+            $mail->Port       = 465;
         } else {
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; // TLS
+            $mail->Port       = (int)$port ?: 587;
         }
-        $mail->Port       = $port;
-        $mail->CharSet    = 'UTF-8';
 
         $mail->setFrom($from ?: $username, $from_name);
         $mail->addReplyTo($from ?: $username, $from_name);
@@ -99,6 +109,7 @@ function sendMail(string $to_email, string $to_name, string $subject, string $ht
         return ['success' => true, 'error' => ''];
 
     } catch (Exception $e) {
+        // Return full PHPMailer debug info so the admin can see exactly what failed
         return ['success' => false, 'error' => $mail->ErrorInfo];
     }
 }

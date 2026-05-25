@@ -1,4 +1,8 @@
 <?php
+// ============================================================
+// BiT Payroll — Login Page (controller)
+// All business logic lives in AuthService.
+// ============================================================
 session_start();
 
 // Redirect if already logged in
@@ -9,123 +13,23 @@ if (isset($_SESSION['user_id'])) {
 
 require_once '../../database/db_connect.php';
 require_once '../../includes/notify.php';
+require_once '../../includes/AuthService.php';
 
-$error   = '';
-$MAX_ATTEMPTS = 5;          // lock after 5 failures
-$LOCK_MINUTES = 15;         // lock duration
+$error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';   // do NOT trim passwords
 
-    if (empty($username) || empty($password)) {
-        $error = 'Please enter both username and password.';
-    } elseif (strlen($username) > 60 || strlen($password) > 200) {
-        $error = 'Invalid credentials.';   // reject oversized inputs silently
-    } else {
-        $pdo = getDB();
-        $ip  = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $auth   = new AuthService(getDB());
+    $result = $auth->attempt($username, $password);
 
-        // ── Brute-force lockout check ─────────────────────
-        $fail_stmt = $pdo->prepare("
-            SELECT COUNT(*) FROM audit_logs
-            WHERE  status = 'failed'
-            AND    action = 'Login'
-            AND    ip_address = ?
-            AND    logged_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)
-        ");
-        $fail_stmt->execute([$ip, $LOCK_MINUTES]);
-        $recent_fails = (int)$fail_stmt->fetchColumn();
-
-        if ($recent_fails >= $MAX_ATTEMPTS) {
-            $error = "Too many failed login attempts. Please wait {$LOCK_MINUTES} minutes before trying again.";
-        } else {
-            // Fetch user
-            $stmt = $pdo->prepare("
-                SELECT user_id, username, password, role, full_name, is_active, profile_photo
-                FROM   users
-                WHERE  username = ?
-                LIMIT  1
-            ");
-            $stmt->execute([$username]);
-            $user = $stmt->fetch();
-
-            if ($user && $user['is_active'] && password_verify($password, $user['password'])) {
-                // ── Successful login ──────────────────────
-                // Regenerate session ID to prevent session fixation
-                session_regenerate_id(true);
-
-                $_SESSION['user_id']       = $user['user_id'];
-                $_SESSION['username']      = $user['username'];
-                $_SESSION['role']          = $user['role'];
-                $_SESSION['name']          = $user['full_name'];
-                $_SESSION['profile_photo'] = $user['profile_photo'] ?? null;
-                $_SESSION['last_activity'] = time();
-
-                // Update last_login
-                $pdo->prepare("UPDATE users SET last_login = NOW() WHERE user_id = ?")
-                    ->execute([$user['user_id']]);
-
-                // Audit log — success
-                $pdo->prepare("
-                    INSERT INTO audit_logs
-                        (user_id, username, role, action, details, ip_address, status)
-                    VALUES (?, ?, ?, 'Login', 'Successful login', ?, 'success')
-                ")->execute([$user['user_id'], $user['username'], $user['role'], $ip]);
-
-                // Redirect by role
-                switch ($user['role']) {
-                    case 'admin':    header('Location: ../admin/dashboard.php');    break;
-                    case 'hr':       header('Location: ../hr/dashboard.php');       break;
-                    case 'finance':  header('Location: ../finance/dashboard.php');  break;
-                    case 'employee': header('Location: ../employee/dashboard.php'); break;
-                    default:         header('Location: ../auth/login.php');
-                }
-                exit();
-
-            } else {
-                // ── Failed login ──────────────────────────
-                if ($user) {
-                    $pdo->prepare("
-                        INSERT INTO audit_logs
-                            (user_id, username, role, action, details, ip_address, status)
-                        VALUES (?, ?, ?, 'Login', 'Failed login attempt', ?, 'failed')
-                    ")->execute([$user['user_id'], $user['username'], $user['role'], $ip]);
-                } else {
-                    $pdo->prepare("
-                        INSERT INTO audit_logs
-                            (username, action, details, ip_address, status)
-                        VALUES (?, 'Login', 'Unknown username attempt', ?, 'failed')
-                    ")->execute([$username, $ip]);
-                }
-
-                // Alert admins after 3 failures from same IP
-                try {
-                    $fail_count = $pdo->prepare("
-                        SELECT COUNT(*) FROM audit_logs
-                        WHERE status='failed' AND action='Login'
-                        AND ip_address=? AND logged_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)
-                    ");
-                    $fail_count->execute([$ip]);
-                    if ((int)$fail_count->fetchColumn() >= 3) {
-                        notify_role($pdo, 'admin',
-                            '⚠️ Multiple Failed Login Attempts',
-                            "IP {$ip} has failed to login 3+ times in the last 10 minutes. Username tried: {$username}",
-                            'danger');
-                    }
-                } catch (Exception $e) { /* ignore */ }
-
-                $remaining = max(0, $MAX_ATTEMPTS - $recent_fails - 1);
-                if ($user && !$user['is_active']) {
-                    $error = 'Your account has been deactivated. Contact the administrator.';
-                } elseif ($remaining > 0) {
-                    $error = "Invalid username or password. {$remaining} attempt(s) remaining before lockout.";
-                } else {
-                    $error = 'Invalid credentials.';
-                }
-            }
-        }
+    if ($result['success']) {
+        header('Location: ' . $result['redirect']);
+        exit();
     }
+
+    $error = $result['error'];
 }
 ?>
 <!DOCTYPE html>
@@ -158,19 +62,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="brand-features">
                 <div class="brand-feature">
                     <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
-                    <span>Role-based access — Admin, HR, Finance & Staff</span>
+                    <span>Role-based access — Admin, HR, Finance &amp; Staff</span>
                 </div>
                 <div class="brand-feature">
                     <div class="feature-icon"><i class="fas fa-calculator"></i></div>
-                    <span>Automated Ethiopian tax & pension (2025 brackets)</span>
+                    <span>Automated Ethiopian tax &amp; pension (2025 brackets)</span>
                 </div>
                 <div class="brand-feature">
                     <div class="feature-icon"><i class="fas fa-file-invoice"></i></div>
-                    <span>Electronic payslip generation & download</span>
+                    <span>Electronic payslip generation &amp; download</span>
                 </div>
                 <div class="brand-feature">
                     <div class="feature-icon"><i class="fas fa-chart-bar"></i></div>
-                    <span>Comprehensive payroll reports & analytics</span>
+                    <span>Comprehensive payroll reports &amp; analytics</span>
                 </div>
             </div>
         </div>
