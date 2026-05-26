@@ -12,7 +12,7 @@ $error   = '';
 $cur_month = (int)date('n');
 $cur_year  = (int)date('Y');
 
-// â”€â”€ Load deduction rates from system_settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Load deduction rates from system_settings --
 $rates = $pdo->query("
     SELECT setting_key, setting_value FROM system_settings
     WHERE  setting_key IN ('credit_association_rate','renaissance_dam_rate')
@@ -25,7 +25,7 @@ $selected_emp_id = trim($_GET['emp'] ?? '');
 $f_month = (int)($_GET['month'] ?? $cur_month);
 $f_year  = (int)($_GET['year']  ?? $cur_year);
 
-// â”€â”€ SAVE / UPDATE deduction row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Save or update a deduction row for the selected employee and period --
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_deductions'])) {
     $emp_id             = trim($_POST['emp_id']             ?? '');
     $credit_association = (float)($_POST['credit_association'] ?? 0);
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_deductions'])) {
         $error = 'Please select an employee.';
     } else {
         try {
-            // Upsert &mdash; update if exists for this period, insert if not
+            // Upsert: update if a record already exists for this period, otherwise insert
             $check = $pdo->prepare("
                 SELECT deduction_id FROM deductions
                 WHERE emp_id = ? AND effective_month = ? AND effective_year = ?
@@ -87,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_deductions'])) {
 
             $total = $credit_association + $renaissance_dam + $loan_repayment + $penalty + $other;
 
+            // Write audit log entry
             $pdo->prepare("
                 INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
                 VALUES (?, ?, ?, 'Update Deductions', ?, ?, ?)
@@ -109,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_deductions'])) {
     }
 }
 
-// â”€â”€ Load active employees â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Load all active employees for the selector --
 $employees = $pdo->query("
     SELECT e.emp_id, e.full_name, e.basic_salary, d.dept_name
     FROM   employees e
@@ -118,7 +119,7 @@ $employees = $pdo->query("
     ORDER  BY e.full_name
 ")->fetchAll();
 
-// â”€â”€ Selected employee info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Load selected employee info and their deduction for the selected period --
 $sel_emp = null;
 $sel_ded = null;
 if ($selected_emp_id) {
@@ -131,7 +132,7 @@ if ($selected_emp_id) {
     $s->execute([$selected_emp_id]);
     $sel_emp = $s->fetch();
 
-    // Load existing deduction for selected period
+    // Load existing deduction record for the selected period
     $ds = $pdo->prepare("
         SELECT * FROM deductions
         WHERE emp_id = ? AND effective_month = ? AND effective_year = ?
@@ -140,7 +141,7 @@ if ($selected_emp_id) {
     $sel_ded = $ds->fetch();
 }
 
-// â”€â”€ Monthly deductions overview (all employees) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Load deductions overview for all active employees for the selected period --
 $overview = $pdo->query("
     SELECT
         e.emp_id,
@@ -165,7 +166,7 @@ $overview = $pdo->query("
     ORDER BY e.full_name
 ")->fetchAll();
 
-// â”€â”€ Totals for the month â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Accumulate column totals for the footer row --
 $totals = [
     'credit_association' => 0,
     'renaissance_dam'    => 0,
@@ -202,7 +203,7 @@ require_once $depth . 'includes/header.php';
 <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <span><?= htmlspecialchars($error) ?></span></div>
 <?php endif; ?>
 
-<!-- â”€â”€ Info Box â”€â”€ -->
+<!-- Deduction structure explanation -->
 <div class="alert alert-info mb-3">
     <i class="fas fa-info-circle"></i>
     <div style="font-size:0.88rem;">
@@ -217,7 +218,7 @@ require_once $depth . 'includes/header.php';
 
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-    <!-- â”€â”€ Entry Form â”€â”€ -->
+    <!-- Deduction Entry Form -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-edit" style="color:var(--danger);margin-right:8px"></i>
@@ -227,7 +228,7 @@ require_once $depth . 'includes/header.php';
         <div class="card-body">
             <form method="POST" action="">
 
-                <!-- Period selector -->
+                <!-- Period selector: submits on change to reload the page for the new period -->
                 <div class="form-row" style="margin-bottom:4px;">
                     <div class="form-group">
                         <label class="form-label">Month</label>
@@ -253,7 +254,7 @@ require_once $depth . 'includes/header.php';
                     </div>
                 </div>
 
-                <!-- Employee selector -->
+                <!-- Employee selector: submits on change to load their existing deduction -->
                 <div class="form-group">
                     <label class="form-label">Select Employee <span style="color:var(--danger)">*</span></label>
                     <select name="emp_id" class="form-control" required
@@ -270,7 +271,7 @@ require_once $depth . 'includes/header.php';
 
                 <?php if ($sel_emp): ?>
 
-                <!-- Employee info bar -->
+                <!-- Employee info summary bar -->
                 <div style="background:var(--bg-light);border-radius:var(--radius);
                      padding:12px 14px;margin-bottom:16px;
                      display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
@@ -289,7 +290,7 @@ require_once $depth . 'includes/header.php';
                     </div>
                 </div>
 
-                <!-- Deduction fields &mdash; matching spreadsheet columns -->
+                <!-- Deduction input fields -->
                 <div style="background:var(--gray-100);border-radius:var(--radius);padding:14px;margin-bottom:16px;">
                     <p style="font-size:0.78rem;font-weight:700;color:var(--gray-600);
                                text-transform:uppercase;margin:0 0 12px;">
@@ -297,20 +298,18 @@ require_once $depth . 'includes/header.php';
                     </p>
 
                     <?php
-                    // Auto-calculate defaults from basic salary
                     $basic = (float)$sel_emp['basic_salary'];
-                    $default_credit = round($basic * $CREDIT_RATE, 2);  // 10% of basic
-                    $default_gerd   = round($basic * $GERD_RATE,   2);  // 1% of basic
+                    $default_credit = round($basic * $CREDIT_RATE, 2);
+                    $default_gerd   = round($basic * $GERD_RATE,   2);
 
                     $ded_fields = [
-                        ['credit_association', 'Credit Association (10% of basic)',    'fas fa-handshake',         'var(--info)',     'Default: 10% of basic salary',   $default_credit],
-                        ['renaissance_dam',    'Renaissance Dam &mdash; GERD (1% of basic)', 'fas fa-water',             'var(--primary)', 'Default: 1% of basic salary',    $default_gerd],
-                        ['loan_repayment',     'Loan Repayment',                       'fas fa-hand-holding-usd',  'var(--warning)', 'Monthly loan installment',       0],
-                        ['penalty',            'Penalty / Absence',                    'fas fa-exclamation-triangle','var(--danger)', 'Penalty or absence deduction',  0],
-                        ['other',              'Other Deduction',                      'fas fa-minus-circle',      'var(--gray-600)','Any other deduction',            0],
+                        ['credit_association', 'Credit Association (10% of basic)',          'fas fa-handshake',          'var(--info)',     'Default: 10% of basic salary',  $default_credit],
+                        ['renaissance_dam',    'Renaissance Dam &mdash; GERD (1% of basic)', 'fas fa-water',              'var(--primary)', 'Default: 1% of basic salary',    $default_gerd],
+                        ['loan_repayment',     'Loan Repayment',                             'fas fa-hand-holding-usd',   'var(--warning)', 'Monthly loan installment',       0],
+                        ['penalty',            'Penalty / Absence',                          'fas fa-exclamation-triangle','var(--danger)', 'Penalty or absence deduction',   0],
+                        ['other',              'Other Deduction',                            'fas fa-minus-circle',       'var(--gray-600)','Any other deduction',            0],
                     ];
                     foreach ($ded_fields as [$fname, $flabel, $ficon, $fcolor, $fhint, $fdefault]):
-                        // Use saved value if record exists, otherwise use default
                         $cur_val = isset($sel_ded[$fname]) ? (float)$sel_ded[$fname] : $fdefault;
                     ?>
                     <div class="form-group" style="margin-bottom:12px;">
@@ -337,7 +336,7 @@ require_once $depth . 'includes/header.php';
                     <?php endforeach; ?>
                 </div>
 
-                <!-- Live total preview -->
+                <!-- Live total deductions preview -->
                 <div style="background:var(--danger-light);border-radius:var(--radius);
                      padding:14px;border-left:4px solid var(--danger);margin-bottom:16px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -350,7 +349,6 @@ require_once $depth . 'includes/header.php';
                             </p>
                         </div>
                         <?php
-                        // Show current total (saved or defaults)
                         $display_total = isset($sel_ded)
                             ? (($sel_ded['credit_association'] ?? 0) +
                                ($sel_ded['renaissance_dam']    ?? 0) +
@@ -377,6 +375,7 @@ require_once $depth . 'includes/header.php';
                 </button>
 
                 <?php if ($sel_ded): ?>
+                <!-- Confirmation that an existing record will be updated -->
                 <p style="text-align:center;font-size:0.78rem;color:var(--success);margin-top:8px;">
                     <i class="fas fa-check-circle"></i>
                     Record exists for <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?> &mdash; will be updated.
@@ -394,7 +393,7 @@ require_once $depth . 'includes/header.php';
         </div>
     </div>
 
-    <!-- â”€â”€ Deduction Summary for selected employee â”€â”€ -->
+    <!-- Deduction history for the selected employee -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-history" style="color:var(--primary);margin-right:8px"></i>
@@ -406,7 +405,7 @@ require_once $depth . 'includes/header.php';
         <div class="card-body" style="padding:0">
             <?php if ($sel_emp): ?>
             <?php
-            // Load last 6 months for this employee
+            // Load last 6 months of deduction records for this employee
             $hist = $pdo->prepare("
                 SELECT effective_month, effective_year,
                        credit_association, renaissance_dam,
@@ -453,9 +452,7 @@ require_once $depth . 'includes/header.php';
                             <td><?= number_format($h['loan_repayment'],     2) ?></td>
                             <td><?= number_format($h['penalty'],            2) ?></td>
                             <td><?= number_format($h['other'],              2) ?></td>
-                            <td class="text-bold text-danger">
-                                <?= number_format($h['total'], 2) ?>
-                            </td>
+                            <td class="text-bold text-danger"><?= number_format($h['total'], 2) ?></td>
                             <td>
                                 <span class="badge <?= $h['status'] === 'active' ? 'badge-warning' : ($h['status'] === 'applied' ? 'badge-success' : 'badge-danger') ?>">
                                     <?= ucfirst($h['status']) ?>
@@ -478,7 +475,7 @@ require_once $depth . 'includes/header.php';
 
 </div>
 
-<!-- â”€â”€ Monthly Overview Table (matches spreadsheet layout) â”€â”€ -->
+<!-- All employees deductions overview for the selected period -->
 <div class="card">
     <div class="card-header">
         <h3>
@@ -486,7 +483,7 @@ require_once $depth . 'includes/header.php';
             All Employees &mdash; Deductions for
             <?= date('F', mktime(0,0,0,$f_month,1)) ?> <?= $f_year ?>
         </h3>
-        <!-- Period switcher -->
+        <!-- Period switcher for the overview table -->
         <form method="GET" action="" style="display:flex;gap:8px;align-items:center;">
             <select name="month" class="form-control" style="width:auto;font-size:0.82rem;">
                 <?php for ($m = 1; $m <= 12; $m++): ?>
@@ -532,34 +529,22 @@ require_once $depth . 'includes/header.php';
                         </td>
                         <td><?= number_format($row['basic_salary'], 2) ?></td>
                         <td style="color:var(--info);">
-                            <?= $row['credit_association'] > 0
-                                ? number_format($row['credit_association'], 2)
-                                : '<span class="text-muted">&mdash;</span>' ?>
+                            <?= $row['credit_association'] > 0 ? number_format($row['credit_association'], 2) : '<span class="text-muted">&mdash;</span>' ?>
                         </td>
                         <td style="color:var(--primary);">
-                            <?= $row['renaissance_dam'] > 0
-                                ? number_format($row['renaissance_dam'], 2)
-                                : '<span class="text-muted">&mdash;</span>' ?>
+                            <?= $row['renaissance_dam'] > 0 ? number_format($row['renaissance_dam'], 2) : '<span class="text-muted">&mdash;</span>' ?>
                         </td>
                         <td style="color:var(--warning);">
-                            <?= $row['loan_repayment'] > 0
-                                ? number_format($row['loan_repayment'], 2)
-                                : '<span class="text-muted">&mdash;</span>' ?>
+                            <?= $row['loan_repayment'] > 0 ? number_format($row['loan_repayment'], 2) : '<span class="text-muted">&mdash;</span>' ?>
                         </td>
                         <td style="color:var(--danger);">
-                            <?= $row['penalty'] > 0
-                                ? number_format($row['penalty'], 2)
-                                : '<span class="text-muted">&mdash;</span>' ?>
+                            <?= $row['penalty'] > 0 ? number_format($row['penalty'], 2) : '<span class="text-muted">&mdash;</span>' ?>
                         </td>
                         <td>
-                            <?= $row['other'] > 0
-                                ? number_format($row['other'], 2)
-                                : '<span class="text-muted">&mdash;</span>' ?>
+                            <?= $row['other'] > 0 ? number_format($row['other'], 2) : '<span class="text-muted">&mdash;</span>' ?>
                         </td>
                         <td style="font-weight:700;color:var(--danger);">
-                            <?= $row['total_other_deductions'] > 0
-                                ? 'ETB ' . number_format($row['total_other_deductions'], 2)
-                                : '<span class="text-muted">&mdash;</span>' ?>
+                            <?= $row['total_other_deductions'] > 0 ? 'ETB ' . number_format($row['total_other_deductions'], 2) : '<span class="text-muted">&mdash;</span>' ?>
                         </td>
                         <td>
                             <a href="deductions.php?emp=<?= urlencode($row['emp_id']) ?>&month=<?= $f_month ?>&year=<?= $f_year ?>"
@@ -570,30 +555,18 @@ require_once $depth . 'includes/header.php';
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
-                <!-- Totals row -->
+                <!-- Grand totals footer row -->
                 <tfoot>
                     <tr style="background:var(--bg-light);font-weight:700;">
                         <td colspan="3" style="padding:12px 16px;color:var(--primary);">
                             TOTALS (<?= count($overview) ?> employees)
                         </td>
-                        <td style="padding:12px 16px;color:var(--info);">
-                            <?= number_format($totals['credit_association'], 2) ?>
-                        </td>
-                        <td style="padding:12px 16px;color:var(--primary);">
-                            <?= number_format($totals['renaissance_dam'], 2) ?>
-                        </td>
-                        <td style="padding:12px 16px;color:var(--warning);">
-                            <?= number_format($totals['loan_repayment'], 2) ?>
-                        </td>
-                        <td style="padding:12px 16px;color:var(--danger);">
-                            <?= number_format($totals['penalty'], 2) ?>
-                        </td>
-                        <td style="padding:12px 16px;">
-                            <?= number_format($totals['other'], 2) ?>
-                        </td>
-                        <td style="padding:12px 16px;color:var(--danger);font-size:1rem;">
-                            ETB <?= number_format($totals['total'], 2) ?>
-                        </td>
+                        <td style="padding:12px 16px;color:var(--info);"><?= number_format($totals['credit_association'], 2) ?></td>
+                        <td style="padding:12px 16px;color:var(--primary);"><?= number_format($totals['renaissance_dam'], 2) ?></td>
+                        <td style="padding:12px 16px;color:var(--warning);"><?= number_format($totals['loan_repayment'], 2) ?></td>
+                        <td style="padding:12px 16px;color:var(--danger);"><?= number_format($totals['penalty'], 2) ?></td>
+                        <td style="padding:12px 16px;"><?= number_format($totals['other'], 2) ?></td>
+                        <td style="padding:12px 16px;color:var(--danger);">ETB <?= number_format($totals['total'], 2) ?></td>
                         <td></td>
                     </tr>
                 </tfoot>
@@ -608,7 +581,7 @@ require_once $depth . 'includes/header.php';
 </div>
 
 <script>
-// Live total calculation
+// Recalculate and display the total deductions live as inputs change
 function updateTotal() {
     const fields = ['credit_association','renaissance_dam','loan_repayment','penalty','other'];
     let total = 0;
@@ -627,4 +600,3 @@ document.querySelectorAll('.ded-input').forEach(i => i.addEventListener('input',
 </script>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
-

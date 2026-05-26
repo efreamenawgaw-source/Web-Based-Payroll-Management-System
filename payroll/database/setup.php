@@ -28,11 +28,11 @@ try {
     // Step 2: Drop and recreate the database
     $pdo->exec("DROP DATABASE IF EXISTS payroll_db");
     $pdo->exec("CREATE DATABASE payroll_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    $messages[] = 'âœ… Database payroll_db created.';
+    $messages[] = '&#10003; Database payroll_db created.';
 
     // Step 3: Select the database
     $pdo->exec("USE payroll_db");
-    $messages[] = 'âœ… Using payroll_db.';
+    $messages[] = '&#10003; Using payroll_db.';
 
     // Step 4: Create all tables one by one
     $tables = [];

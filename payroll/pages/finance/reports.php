@@ -8,12 +8,12 @@ require_once $depth . 'includes/header.php';
 
 $pdo = getDB();
 
-// â”€â”€ Filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Read filter values from the GET request --
 $f_period_id = (int)($_GET['period_id'] ?? 0);
 $f_dept      = (int)($_GET['dept']      ?? 0);
 $f_type      = trim($_GET['type']       ?? 'monthly');
 
-// â”€â”€ Load all finalized periods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Load all verified/finalized payroll periods for the period selector --
 $all_periods = $pdo->query("
     SELECT period_id, period_label, period_month, period_year, status
     FROM   payroll_periods
@@ -21,15 +21,15 @@ $all_periods = $pdo->query("
     ORDER  BY period_year DESC, period_month DESC
 ")->fetchAll();
 
-// â”€â”€ Load departments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Load active departments for the department filter --
 $departments = $pdo->query("
     SELECT dept_id, dept_name FROM departments WHERE is_active=1 ORDER BY dept_name
 ")->fetchAll();
 
-// â”€â”€ Selected period data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-$sel_period = null;
+// -- Load payroll records for the selected period --
+$sel_period  = null;
 $report_rows = [];
-$gt = [];
+$gt          = [];
 
 if ($f_period_id) {
     $sp = $pdo->prepare("SELECT * FROM payroll_periods WHERE period_id = ?");
@@ -37,6 +37,7 @@ if ($f_period_id) {
     $sel_period = $sp->fetch();
 
     if ($sel_period) {
+        // Build WHERE clause — always filter by period, optionally by department
         $where  = ['pr.period_id = ?'];
         $params = [$f_period_id];
 
@@ -83,7 +84,7 @@ if ($f_period_id) {
         ));
         $report_rows = $stmt->fetchAll();
 
-        // Grand totals
+        // Calculate grand totals across all rows
         $gt = [
             'basic'            => array_sum(array_column($report_rows, 'basic_salary')),
             'allowances'       => array_sum(array_column($report_rows, 'total_allowances')),
@@ -98,7 +99,7 @@ if ($f_period_id) {
     }
 }
 
-// â”€â”€ Annual summary (all finalized periods this year) â”€â”€â”€â”€â”€â”€â”€
+// -- Annual summary: aggregate all verified/finalized periods for the current year --
 $annual = $pdo->query("
     SELECT
         pp.period_label,
@@ -118,7 +119,7 @@ $annual = $pdo->query("
     ORDER BY pp.period_month ASC
 ")->fetchAll();
 
-// â”€â”€ Department breakdown for selected period â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Department breakdown for the selected period --
 $dept_breakdown = [];
 if ($f_period_id) {
     $db_stmt = $pdo->prepare("
@@ -155,7 +156,7 @@ if ($f_period_id) {
     </button>
 </div>
 
-<!-- â”€â”€ Filter Bar â”€â”€ -->
+<!-- Filter bar: period selector and department filter -->
 <div class="card mb-3">
     <div class="card-body">
         <form method="GET" action="">
@@ -198,14 +199,14 @@ if ($f_period_id) {
 
 <?php if ($sel_period && !empty($report_rows)): ?>
 
-<!-- â”€â”€ Summary Cards â”€â”€ -->
+<!-- Summary stat cards: employee count, gross, tax, net pay -->
 <div class="stats-grid" style="margin-bottom:24px;">
     <?php
     $cards = [
-        ['Employees',        count($report_rows),                  'blue',   'fas fa-users'],
-        ['Total Gross',      'ETB ' . number_format($gt['gross'],2),'green', 'fas fa-money-bill-wave'],
-        ['Total Tax',        'ETB ' . number_format($gt['income_tax'],2),'red','fas fa-percent'],
-        ['Total Net Pay',    'ETB ' . number_format($gt['net_pay'],2),'green','fas fa-hand-holding-usd'],
+        ['Employees',     count($report_rows),                       'blue',  'fas fa-users'],
+        ['Total Gross',   'ETB ' . number_format($gt['gross'], 2),   'green', 'fas fa-money-bill-wave'],
+        ['Total Tax',     'ETB ' . number_format($gt['income_tax'], 2), 'red','fas fa-percent'],
+        ['Total Net Pay', 'ETB ' . number_format($gt['net_pay'], 2), 'green', 'fas fa-hand-holding-usd'],
     ];
     foreach ($cards as [$label, $val, $color, $icon]): ?>
     <div class="stat-card">
@@ -219,7 +220,7 @@ if ($f_period_id) {
     <?php endforeach; ?>
 </div>
 
-<!-- â”€â”€ Main Report Table â”€â”€ -->
+<!-- Main payroll report table with grouped deduction columns -->
 <div class="card mb-3">
     <div class="card-header">
         <h3>
@@ -273,6 +274,7 @@ if ($f_period_id) {
                         </td>
                         <td><?= number_format($r['basic_salary'], 2) ?></td>
                         <td style="text-align:center;">
+                            <!-- Badge turns yellow if the employee worked fewer than 30 days -->
                             <span class="badge <?= $r['working_days'] == 30 ? 'badge-success' : 'badge-warning' ?>">
                                 <?= $r['working_days'] ?>
                             </span>
@@ -289,6 +291,7 @@ if ($f_period_id) {
                     <?php endforeach; ?>
                 </tbody>
                 <tfoot>
+                    <!-- Grand totals row -->
                     <tr style="background:var(--bg-light);font-weight:700;">
                         <td colspan="4" style="padding:12px 16px;color:var(--primary);">TOTALS (<?= count($report_rows) ?>)</td>
                         <td style="padding:12px 16px;"><?= number_format($gt['basic'], 2) ?></td>
@@ -308,7 +311,7 @@ if ($f_period_id) {
     </div>
 </div>
 
-<!-- â”€â”€ Department Breakdown â”€â”€ -->
+<!-- Department breakdown: progress bars showing gross pay per department -->
 <?php if (!empty($dept_breakdown)): ?>
 <div class="card mb-3">
     <div class="card-header">
@@ -318,6 +321,7 @@ if ($f_period_id) {
     </div>
     <div class="card-body">
         <?php
+        // Use the highest gross as 100% to scale the progress bars
         $max_gross = max(array_column($dept_breakdown, 'total_gross')) ?: 1;
         foreach ($dept_breakdown as $db):
             $pct = round(($db['total_gross'] / $max_gross) * 100);
@@ -344,7 +348,7 @@ if ($f_period_id) {
 
 <?php endif; ?>
 
-<!-- â”€â”€ Annual Summary â”€â”€ -->
+<!-- Annual summary table: one row per processed month in the current year -->
 <?php if (!empty($annual)): ?>
 <div class="card">
     <div class="card-header">
@@ -370,6 +374,7 @@ if ($f_period_id) {
                 </thead>
                 <tbody>
                     <?php
+                    // Accumulate year-to-date totals while rendering each row
                     $ann_gt = array_fill_keys(['gross','tax','pen_emp','pen_org','other','net'], 0);
                     foreach ($annual as $a):
                         $ann_gt['gross']   += $a['total_gross'];
@@ -392,6 +397,7 @@ if ($f_period_id) {
                     <?php endforeach; ?>
                 </tbody>
                 <tfoot>
+                    <!-- Year-to-date totals row -->
                     <tr style="background:var(--bg-light);font-weight:700;">
                         <td style="padding:12px 16px;color:var(--primary);">YEAR TOTAL</td>
                         <td style="padding:12px 16px;"></td>
@@ -408,6 +414,7 @@ if ($f_period_id) {
     </div>
 </div>
 <?php else: ?>
+<!-- No payrolls finalized yet for this year -->
 <div class="card">
     <div class="card-body">
         <div class="empty-state">
@@ -422,4 +429,3 @@ if ($f_period_id) {
 <?php endif; ?>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
-

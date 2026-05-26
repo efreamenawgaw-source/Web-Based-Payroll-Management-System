@@ -10,7 +10,7 @@ $pdo     = getDB();
 $success = '';
 $error   = '';
 
-// â”€â”€ Load processed periods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Load all processed payroll periods --
 $periods = $pdo->query("
     SELECT pp.period_id, pp.period_label, pp.period_month, pp.period_year,
            pp.status, pp.processed_at,
@@ -26,7 +26,7 @@ $periods = $pdo->query("
     ORDER  BY pp.period_year DESC, pp.period_month DESC
 ")->fetchAll();
 
-// â”€â”€ Selected period â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Determine the selected period (from GET or POST) --
 $sel_period_id = (int)($_GET['period_id'] ?? ($_POST['period_id'] ?? 0));
 $sel_period    = null;
 $records       = [];
@@ -37,6 +37,7 @@ if ($sel_period_id) {
     $sel_period = $sp->fetch();
 
     if ($sel_period) {
+        // Load all payroll records for the selected period
         $rec_stmt = $pdo->prepare("
             SELECT pr.*,
                    e.full_name, e.basic_salary AS emp_basic,
@@ -52,17 +53,22 @@ if ($sel_period_id) {
     }
 }
 
-// â”€â”€ HANDLE APPROVE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ============================================================
+// HANDLE APPROVE
+// Sets the payroll period status to 'verified' and logs the action.
+// ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
     $pid = (int)($_POST['period_id'] ?? 0);
     if ($pid) {
         try {
+            // Mark the period as verified
             $pdo->prepare("
                 UPDATE payroll_periods
                 SET status = 'verified', verified_by = ?, verified_at = NOW()
                 WHERE period_id = ? AND status = 'processed'
             ")->execute([$_SESSION['user_id'], $pid]);
 
+            // Write audit log entry
             $pdo->prepare("
                 INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
                 VALUES (?, ?, ?, 'Verify Payroll', ?, 'Payroll approved and verified', ?)
@@ -75,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
                      . '<a href="generate_payslip.php?period_id=' . $pid . '" class="btn btn-primary btn-sm" style="margin-left:10px;">'
                      . '<i class="fas fa-file-invoice-dollar"></i> Generate Payslips</a>';
 
-            // Get period label
+            // Fetch the period label for notifications
             $pl = $pdo->prepare("SELECT period_label FROM payroll_periods WHERE period_id=?");
             $pl->execute([$pid]);
             $pl_row = $pl->fetch();
@@ -93,11 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
                 "Payroll for {$plabel} has been verified. Payslips will be generated shortly.",
                 'success');
 
-            // Reload
-            $sp->execute([$pid]);
-            $sel_period = $pdo->prepare("SELECT * FROM payroll_periods WHERE period_id=?")->execute([$pid])
-                        ? ($pdo->prepare("SELECT * FROM payroll_periods WHERE period_id=?")->execute([$pid]) ? null : null)
-                        : null;
+            // Reload the updated period record
             $sp2 = $pdo->prepare("SELECT * FROM payroll_periods WHERE period_id=?");
             $sp2->execute([$pid]);
             $sel_period = $sp2->fetch();
@@ -108,18 +110,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
     }
 }
 
-// â”€â”€ HANDLE REJECT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ============================================================
+// HANDLE REJECT
+// Resets the period status to 'pending' so Finance can re-process.
+// ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reject'])) {
     $pid    = (int)($_POST['period_id'] ?? 0);
     $reason = trim($_POST['reject_reason'] ?? '');
     if ($pid) {
         try {
+            // Reset status to pending and store the rejection reason in notes
             $pdo->prepare("
                 UPDATE payroll_periods
                 SET status = 'pending', notes = ?
                 WHERE period_id = ?
             ")->execute([$reason ?: 'Rejected by Finance', $pid]);
 
+            // Write audit log entry
             $pdo->prepare("
                 INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
                 VALUES (?, ?, ?, 'Reject Payroll', ?, ?, ?)
@@ -138,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reject'])) {
     }
 }
 
-// â”€â”€ Grand totals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Calculate grand totals from the loaded records --
 $gt = [];
 if (!empty($records)) {
     $gt = [
@@ -151,6 +158,7 @@ if (!empty($records)) {
     ];
 }
 
+// Badge CSS class mapped to each period status
 $status_badge = [
     'pending'   => 'badge-gray',
     'processed' => 'badge-warning',
@@ -184,7 +192,7 @@ require_once $depth . 'includes/header.php';
 
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-    <!-- â”€â”€ Processed Periods List â”€â”€ -->
+    <!-- Processed Periods List -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-list" style="color:var(--primary);margin-right:8px"></i>
@@ -239,7 +247,7 @@ require_once $depth . 'includes/header.php';
         </div>
     </div>
 
-    <!-- â”€â”€ Period Summary â”€â”€ -->
+    <!-- Period Summary and Approve / Reject Actions -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-chart-pie" style="color:var(--primary);margin-right:8px"></i>
@@ -254,6 +262,7 @@ require_once $depth . 'includes/header.php';
         <div class="card-body">
             <?php if ($sel_period && !empty($gt)): ?>
             <?php
+            // Summary rows: label, formatted value, color
             $summary_rows = [
                 ['Employees Processed',    count($records),                                        'var(--primary)'],
                 ['Total Gross Earnings',   'ETB ' . number_format($gt['gross'], 2),               'var(--primary)'],
@@ -270,14 +279,14 @@ require_once $depth . 'includes/header.php';
             </div>
             <?php endforeach; ?>
 
-            <!-- Approve / Reject -->
+            <!-- Approve / Reject buttons — only shown when status is 'processed' -->
             <?php if ($sel_period['status'] === 'processed'): ?>
             <div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">
                 <form method="POST" action="">
                     <input type="hidden" name="period_id" value="<?= $sel_period['period_id'] ?>">
                     <button type="submit" name="approve" class="btn btn-success w-100"
                             onclick="return confirm('Approve and finalize this payroll?')">
-                        <i class="fas fa-check-double"></i> Approve & Verify
+                        <i class="fas fa-check-double"></i> Approve &amp; Verify
                     </button>
                 </form>
                 <form method="POST" action="">
@@ -293,6 +302,7 @@ require_once $depth . 'includes/header.php';
                 </form>
             </div>
             <?php elseif ($sel_period['status'] === 'verified'): ?>
+            <!-- Period already verified — show link to generate payslips -->
             <div style="margin-top:18px;">
                 <a href="generate_payslip.php?period_id=<?= $sel_period['period_id'] ?>"
                    class="btn btn-primary w-100">
@@ -302,6 +312,7 @@ require_once $depth . 'includes/header.php';
             <?php endif; ?>
 
             <?php else: ?>
+            <!-- No period selected yet -->
             <div class="empty-state">
                 <div class="empty-icon"><i class="fas fa-mouse-pointer"></i></div>
                 <p>Select a period from the list to review.</p>
@@ -312,7 +323,7 @@ require_once $depth . 'includes/header.php';
 
 </div>
 
-<!-- â”€â”€ Detailed Records Table â”€â”€ -->
+<!-- Detailed Payroll Records Table for the selected period -->
 <?php if ($sel_period && !empty($records)): ?>
 <div class="card">
     <div class="card-header">
@@ -364,6 +375,7 @@ require_once $depth . 'includes/header.php';
                     <?php endforeach; ?>
                 </tbody>
                 <tfoot>
+                    <!-- Grand totals row -->
                     <tr style="background:var(--bg-light);font-weight:700;">
                         <td colspan="4" style="padding:12px 16px;color:var(--primary);">TOTALS</td>
                         <td style="padding:12px 16px;color:var(--success);"><?= number_format($gt['gross'], 2) ?></td>
@@ -381,5 +393,3 @@ require_once $depth . 'includes/header.php';
 <?php endif; ?>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
-
-

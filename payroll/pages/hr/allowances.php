@@ -9,10 +9,10 @@ $pdo     = getDB();
 $success = '';
 $error   = '';
 
-// â”€â”€ Pre-select employee from query string â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Pre-select employee from query string --
 $selected_emp_id = trim($_GET['emp'] ?? '');
 
-// â”€â”€ Handle SAVE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Handle SAVE allowances form submission --
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_allowances'])) {
     $emp_id         = trim($_POST['emp_id']            ?? '');
     $housing        = (float)($_POST['housing']        ?? 0);
@@ -26,14 +26,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_allowances'])) {
         $error = 'Please select an employee.';
     } else {
         try {
-            // Close previous active allowance
+            // Close the previous active allowance record for this employee
             $pdo->prepare("
                 UPDATE allowances
                 SET    effective_to = CURDATE()
                 WHERE  emp_id = ? AND effective_to IS NULL
             ")->execute([$emp_id]);
 
-            // Insert new allowance record
+            // Insert the new allowance record
             $pdo->prepare("
                 INSERT INTO allowances
                     (emp_id, housing, transport, position_allowance,
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_allowances'])) {
                 $teaching, $other, $effective_from, $_SESSION['user_id']
             ]);
 
-            // Audit log
+            // Write audit log entry
             $pdo->prepare("
                 INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
                 VALUES (?, ?, ?, 'Update Allowances', ?, ?, ?)
@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_allowances'])) {
     }
 }
 
-// â”€â”€ Load all active employees â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Load all active employees for the selector --
 $employees = $pdo->query("
     SELECT e.emp_id, e.full_name, e.basic_salary, d.dept_name
     FROM   employees e
@@ -72,7 +72,7 @@ $employees = $pdo->query("
     ORDER  BY e.full_name
 ")->fetchAll();
 
-// â”€â”€ Load selected employee's current allowances â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Load the selected employee's current allowances --
 $current = null;
 $sel_emp = null;
 if ($selected_emp_id) {
@@ -94,7 +94,7 @@ if ($selected_emp_id) {
     $current = $cur_stmt->fetch();
 }
 
-// â”€â”€ All employees allowances overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Load allowances overview for all active employees (max 20 rows) --
 $overview = $pdo->query("
     SELECT e.emp_id, e.full_name, e.basic_salary,
            COALESCE(a.housing, 0)            AS housing,
@@ -132,7 +132,7 @@ require_once $depth . 'includes/header.php';
 
 <div class="grid-2" style="gap:24px;margin-bottom:24px;">
 
-    <!-- â”€â”€ Update Form â”€â”€ -->
+    <!-- Update Allowances Form -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-hand-holding-usd" style="color:var(--success);margin-right:8px"></i>
@@ -142,7 +142,7 @@ require_once $depth . 'includes/header.php';
         <div class="card-body">
             <form method="POST" action="">
 
-                <!-- Employee selector -->
+                <!-- Employee selector — submits form on change to load current values -->
                 <div class="form-group">
                     <label class="form-label">Select Employee <span style="color:var(--danger)">*</span></label>
                     <select name="emp_id" id="empSelect" class="form-control" required
@@ -158,7 +158,7 @@ require_once $depth . 'includes/header.php';
                 </div>
 
                 <?php if ($sel_emp): ?>
-                <!-- Basic salary display -->
+                <!-- Employee info summary bar -->
                 <div style="background:var(--bg-light);border-radius:var(--radius);padding:14px;margin-bottom:18px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                         <div>
@@ -177,7 +177,7 @@ require_once $depth . 'includes/header.php';
                     </div>
                 </div>
 
-                <!-- Allowance fields -->
+                <!-- Allowance input fields -->
                 <div class="form-row">
                     <?php
                     $fields = [
@@ -187,6 +187,7 @@ require_once $depth . 'includes/header.php';
                         ['teaching',       'Teaching Allowance'],
                         ['other',          'Other Allowance'],
                     ];
+                    // Map form field names to DB column names
                     $db_keys = [
                         'housing'        => 'housing',
                         'transport'      => 'transport',
@@ -214,7 +215,7 @@ require_once $depth . 'includes/header.php';
                            value="<?= date('Y-m-d') ?>">
                 </div>
 
-                <!-- Live gross preview -->
+                <!-- Live gross salary preview -->
                 <div style="background:var(--success-light);border-radius:var(--radius);
                      padding:14px;border-left:4px solid var(--success);margin-bottom:16px;">
                     <p style="font-size:0.78rem;color:var(--success);margin:0 0 4px;font-weight:700;">
@@ -243,7 +244,7 @@ require_once $depth . 'includes/header.php';
         </div>
     </div>
 
-    <!-- â”€â”€ Overview Table â”€â”€ -->
+    <!-- Allowances Overview Table -->
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-list" style="color:var(--primary);margin-right:8px"></i>
@@ -307,6 +308,7 @@ require_once $depth . 'includes/header.php';
 <script>
 const basic = <?= (float)$sel_emp['basic_salary'] ?>;
 
+// Recalculate and display estimated gross salary as allowances change
 function updateGross() {
     let total = 0;
     document.querySelectorAll('.allow-input').forEach(i => total += parseFloat(i.value) || 0);
@@ -322,4 +324,3 @@ document.querySelectorAll('.allow-input').forEach(i => i.addEventListener('input
 <?php endif; ?>
 
 <?php require_once $depth . 'includes/footer.php'; ?>
-
