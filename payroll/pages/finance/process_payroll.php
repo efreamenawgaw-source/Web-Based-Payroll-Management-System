@@ -169,15 +169,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_payroll'])) {
                     $ded_stmt->execute([$emp['emp_id'], $period_month, $period_year]);
                     $ded = $ded_stmt->fetch();
 
-                    // Credit Association: use HR value if set, otherwise default 10% of basic
-                    $credit_assoc = ($ded && $ded['credit_association'] > 0)
-                        ? (float)$ded['credit_association']
-                        : round($basic * 0.10, 2);
+                    // Credit Association: use HR value (0 is valid — no fallback)
+                    $credit_assoc = $ded ? (float)$ded['credit_association'] : 0;
 
-                    // Renaissance Dam (GERD): use HR value if set, otherwise default 1% of basic
-                    $gerd = ($ded && $ded['renaissance_dam'] > 0)
-                        ? (float)$ded['renaissance_dam']
-                        : round($basic * 0.01, 2);
+                    // Renaissance Dam (GERD): use HR value (0 is valid — no fallback)
+                    $gerd = $ded ? (float)$ded['renaissance_dam'] : 0;
 
                     // Loan, penalty, other — only from HR entry, no automatic default
                     $loan      = $ded ? (float)$ded['loan_repayment'] : 0;
@@ -303,13 +299,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payroll'])) {
                 $ded_s->execute([$emp['emp_id'], $period_month, $period_year]);
                 $ded = $ded_s->fetch();
 
-                $credit_assoc = ($ded && (float)$ded['credit_association'] > 0)
-                    ? (float)$ded['credit_association']
-                    : round($basic * 0.10, 2);
+                $credit_assoc = $ded ? (float)$ded['credit_association'] : 0;
 
-                $gerd = ($ded && (float)$ded['renaissance_dam'] > 0)
-                    ? (float)$ded['renaissance_dam']
-                    : round($basic * 0.01, 2);
+                $gerd = $ded ? (float)$ded['renaissance_dam'] : 0;
 
                 $loan      = $ded ? (float)$ded['loan_repayment'] : 0;
                 $penalty   = $ded ? (float)$ded['penalty']        : 0;
@@ -412,11 +404,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payroll'])) {
             ");
             $reload->execute([$period_month, $period_year, $period_id]);
             foreach ($reload->fetchAll() as $row) {
-                // Approximate deduction breakdown from stored other_deductions
-                $basic_r       = (float)$row['basic_salary'];
-                $credit_r      = round($basic_r * 0.10, 2);
-                $gerd_r        = round($basic_r * 0.01, 2);
-                $salary_exp_r  = calcSalaryExpense($basic_r, (int)$row['working_days']);
+                // Re-fetch actual deduction breakdown for display
+                $basic_r      = (float)$row['basic_salary'];
+                $salary_exp_r = calcSalaryExpense($basic_r, (int)$row['working_days']);
+                $ded_r = $pdo->prepare("
+                    SELECT credit_association, renaissance_dam, loan_repayment, penalty, other
+                    FROM deductions
+                    WHERE emp_id = ? AND effective_month = ? AND effective_year = ?
+                ");
+                $ded_r->execute([$row['emp_id'], $period_month, $period_year]);
+                $ded_row   = $ded_r->fetch();
+                $credit_r  = $ded_row ? (float)$ded_row['credit_association'] : 0;
+                $gerd_r    = $ded_row ? (float)$ded_row['renaissance_dam']    : 0;
+                $loan_r    = $ded_row ? (float)$ded_row['loan_repayment']     : 0;
+                $penalty_r = $ded_row ? (float)$ded_row['penalty']            : 0;
+                $other_r   = $ded_row ? (float)$ded_row['other']              : 0;
                 $results[] = [
                     'emp_id'             => $row['emp_id'],
                     'full_name'          => $row['full_name'],
@@ -437,9 +439,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payroll'])) {
                     'pension_org'        => (float)$row['pension_org'],
                     'credit_assoc'       => $credit_r,
                     'gerd'               => $gerd_r,
-                    'loan'               => 0,
-                    'penalty'            => 0,
-                    'other_ded'          => max(0, (float)$row['other_deductions'] - $credit_r - $gerd_r),
+                    'loan'               => $loan_r,
+                    'penalty'            => $penalty_r,
+                    'other_ded'          => $other_r,
                     'other_deductions'   => (float)$row['other_deductions'],
                     'total_deductions'   => round((float)$row['income_tax'] + (float)$row['pension_emp'] + (float)$row['other_deductions'], 2),
                     'net_pay'            => (float)$row['net_pay'],
@@ -682,9 +684,9 @@ require_once $depth . 'includes/header.php';
             <button class="btn btn-primary btn-sm" onclick="exportToExcel()">
                 <i class="fas fa-file-excel"></i> Export Excel
             </button>
-            <!-- Print -->
-            <button class="btn btn-secondary btn-sm" onclick="window.print()">
-                <i class="fas fa-print"></i> Print
+            <!-- Export CBE transfer list as Excel spreadsheet -->
+            <button class="btn btn-info btn-sm" onclick="exportCBE()">
+                <i class="fas fa-file-excel"></i> Export CBE (Excel)
             </button>
         </div>
     </div>
@@ -742,7 +744,7 @@ require_once $depth . 'includes/header.php';
                             Other<br>Deduction
                         </th>
                         <th style="background:var(--warning-light);color:var(--warning);text-align:right;font-size:0.68rem;">
-                            Credit(10%)<br>GERD(1%)<br>Loan/Penalty
+                            Credit Assoc.<br>GERD<br>Loan/Penalty
                         </th>
                     </tr>
                 </thead>
@@ -941,6 +943,137 @@ window.addEventListener('DOMContentLoaded', function () {
     if (sel) syncPeriod(sel);
 });
 
+// ── Export CBE salary transfer list as Excel spreadsheet ──
+// Downloads an .xlsx-compatible file (Excel XML) with columns:
+// No. | Employee Full Name | CBE Account Number | Net Pay
+function exportCBE() {
+    const table  = document.getElementById('payrollTable');
+    if (!table) { alert('No payroll data to export.'); return; }
+
+    const period = document.querySelector('.payroll-period-label')?.textContent?.trim() || 'Payroll';
+    const rows   = table.querySelectorAll('tbody tr');
+
+    let dataRows = '';
+    let no = 1;
+    let totalNet = 0;
+
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length < 14) return;
+
+        const fullName = cells[1].querySelector('strong')?.textContent?.trim()
+                      || cells[1].textContent.trim().split('\n')[0].trim();
+        const netPayRaw = cells[13].textContent.trim().replace(/,/g, '');
+        const netPay    = parseFloat(netPayRaw) || 0;
+        const cbeAcct   = cells[14].textContent.trim();
+
+        totalNet += netPay;
+
+        dataRows += `
+   <Row>
+    <Cell><Data ss:Type="Number">${no++}</Data></Cell>
+    <Cell><Data ss:Type="String">${escXml(fullName)}</Data></Cell>
+    <Cell ss:StyleID="sAcct"><Data ss:Type="String">${escXml(cbeAcct)}</Data></Cell>
+    <Cell ss:StyleID="sMoney"><Data ss:Type="Number">${netPay.toFixed(2)}</Data></Cell>
+   </Row>`;
+    });
+
+    // Totals row
+    dataRows += `
+   <Row>
+    <Cell ss:StyleID="sTotal"><Data ss:Type="String"></Data></Cell>
+    <Cell ss:StyleID="sTotal"><Data ss:Type="String">TOTAL (${no - 1} employees)</Data></Cell>
+    <Cell ss:StyleID="sTotal"><Data ss:Type="String"></Data></Cell>
+    <Cell ss:StyleID="sTotalMoney"><Data ss:Type="Number">${totalNet.toFixed(2)}</Data></Cell>
+   </Row>`;
+
+    const today = new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="sHeader">
+   <Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="11"/>
+   <Interior ss:Color="#1565C0" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/></Borders>
+  </Style>
+  <Style ss:ID="sTitle">
+   <Font ss:Bold="1" ss:Size="13"/>
+   <Alignment ss:Horizontal="Center"/>
+  </Style>
+  <Style ss:ID="sSubtitle">
+   <Font ss:Size="10" ss:Color="#555555"/>
+   <Alignment ss:Horizontal="Center"/>
+  </Style>
+  <Style ss:ID="sMoney">
+   <NumberFormat ss:Format="#,##0.00"/>
+   <Alignment ss:Horizontal="Right"/>
+  </Style>
+  <Style ss:ID="sAcct">
+   <Alignment ss:Horizontal="Center"/>
+   <NumberFormat ss:Format="@"/>
+  </Style>
+  <Style ss:ID="sTotal">
+   <Font ss:Bold="1"/>
+   <Interior ss:Color="#E3F2FD" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="sTotalMoney">
+   <Font ss:Bold="1"/>
+   <Interior ss:Color="#E3F2FD" ss:Pattern="Solid"/>
+   <NumberFormat ss:Format="#,##0.00"/>
+   <Alignment ss:Horizontal="Right"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="CBE Transfer">
+  <Table>
+   <Column ss:Width="35"/>
+   <Column ss:Width="200"/>
+   <Column ss:Width="160"/>
+   <Column ss:Width="120"/>
+   <Row ss:Height="22">
+    <Cell ss:MergeAcross="3" ss:StyleID="sTitle">
+     <Data ss:Type="String">Bahir Dar Institute of Technology (BiT) — CBE Salary Transfer</Data>
+    </Cell>
+   </Row>
+   <Row>
+    <Cell ss:MergeAcross="3" ss:StyleID="sSubtitle">
+     <Data ss:Type="String">Period: ${escXml(period)}    |    Date: ${today}</Data>
+    </Cell>
+   </Row>
+   <Row/>
+   <Row>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">No.</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Employee Full Name</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">CBE Account Number</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Net Pay (ETB)</Data></Cell>
+   </Row>
+   ${dataRows}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+    const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `CBE_Transfer_${period.replace(/\s+/g, '_')}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function escXml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 // ── Export payroll table to Excel (.xls) ──────────────────
 // Uses the HTML table export trick: wraps the table in an XLS-compatible
 // HTML document and triggers a download. Opens directly in Excel/LibreOffice.
@@ -951,8 +1084,9 @@ function exportToExcel() {
     const period = document.querySelector('.payroll-period-label')?.textContent?.trim()
                 || 'Payroll';
 
-    // Build a minimal HTML document that Excel recognises as XLS
-    const html = `
+    // Build a minimal HTML document that Excel recognises as XLS.
+    // The \uFEFF BOM ensures Excel opens it with correct UTF-8 encoding.
+    const html = '\uFEFF' + `
 <html xmlns:o="urn:schemas-microsoft-com:office:office"
       xmlns:x="urn:schemas-microsoft-com:office:excel"
       xmlns="http://www.w3.org/TR/REC-html40">
@@ -970,7 +1104,7 @@ function exportToExcel() {
     table { border-collapse: collapse; }
     th, td { border: 1px solid #ccc; padding: 6px 10px; font-size: 11pt; }
     th { background: #1565C0; color: white; font-weight: bold; }
-    .totals-row { background: #E3F2FD; font-weight: bold; }
+    tfoot td { background: #E3F2FD; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -980,15 +1114,15 @@ function exportToExcel() {
 </body>
 </html>`;
 
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
+    // Use a data URI with the correct MIME type so the browser
+    // saves the file with the .xls extension without renaming it.
+    const uri = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(html);
+    const a   = document.createElement('a');
+    a.href     = uri;
     a.download = 'BiT_Payroll_' + period.replace(/\s+/g, '_') + '.xls';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 }
 </script>
 

@@ -151,7 +151,8 @@ function loadNotifications() {
                             ${n.title}
                         </p>
                         <p style="font-size:0.78rem;color:var(--gray-600);margin:0 0 3px;
-                                  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                  overflow:hidden;text-overflow:ellipsis;white-space:normal;
+                                  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">
                             ${n.message}
                         </p>
                         <p style="font-size:0.7rem;color:var(--gray-400);margin:0;">${n.time_ago}</p>

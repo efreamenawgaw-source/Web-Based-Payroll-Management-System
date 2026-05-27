@@ -128,8 +128,8 @@ class EmployeeRegistration
             $errors[] = 'Please select a valid position.';
 
         // Basic salary
-        if ($basic_salary <= 0)
-            $errors[] = 'Basic salary must be greater than 0.';
+        if ($basic_salary < 0)
+            $errors[] = 'Basic salary cannot be negative.';
         elseif ($basic_salary > 500000)
             $errors[] = 'Basic salary seems too high. Please verify.';
 
@@ -223,6 +223,17 @@ class EmployeeRegistration
                 $teaching, $other, $employment_date, $createdBy,
             ]);
 
+            // Insert initial deductions with 0 defaults
+            $ded_month = (int)date('m', strtotime($employment_date));
+            $ded_year  = (int)date('Y', strtotime($employment_date));
+            $this->pdo->prepare("
+                INSERT INTO deductions
+                    (emp_id, credit_association, renaissance_dam,
+                     loan_repayment, penalty, other,
+                     effective_month, effective_year, status, created_by)
+                VALUES (?, 0, 0, 0, 0, 0, ?, ?, 'active', ?)
+            ")->execute([$emp_id, $ded_month, $ded_year, $createdBy]);
+
             // Audit log
             $log = $this->pdo->prepare("
                 INSERT INTO audit_logs
@@ -273,20 +284,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
         try {
             $emp_id   = $service->register($post, (int)$_SESSION['user_id']);
-            $fullName = htmlspecialchars(trim($post['full_name']));
-            $success  = "Employee <strong>{$fullName}</strong> registered with ID <strong>{$emp_id}</strong> successfully!";
+            $fullName = trim($post['full_name']);
+            $empEmail = trim($post['email'] ?? '') ?: null;
 
-            // Notify admin and finance
+            $success = "Employee <strong>" . htmlspecialchars($fullName) . "</strong> registered with ID <strong>{$emp_id}</strong> successfully!";
+
+            // Notify admin with full employee details to create user account
+            $email_line = $empEmail ? $empEmail : 'No email provided';
+
             notify_role($pdo, 'admin',
-                'New Employee Registered',
-                "HR registered new employee: {$fullName} ({$emp_id})",
-                'success');
+                "Create User Account — {$fullName}",
+                "New employee registered by HR. Name: {$fullName} | ID: {$emp_id} | Email: {$email_line} — Please create a login account and link it.",
+                'warning',
+                '/pages/admin/users.php');
+
             notify_role($pdo, 'finance',
                 'New Employee Added',
                 "{$fullName} ({$emp_id}) has been registered. Update allowances and deductions before payroll.",
                 'info');
 
-            // Refresh next ID for a new blank form
             $nextEmpId = $service->generateNextEmpId();
             $post      = [];
 
@@ -467,7 +483,7 @@ require_once $depth . 'includes/header.php';
                 <div class="form-group">
                     <label class="form-label">Basic Salary (ETB) <span style="color:var(--danger)">*</span></label>
                     <input type="number" name="basic_salary" class="form-control"
-                           placeholder="e.g. 12500" min="1" step="0.01"
+                           placeholder="e.g. 12500" min="0" step="0.01"
                            value="<?= htmlspecialchars($post['basic_salary'] ?? '') ?>" required>
                 </div>
                 <div class="form-group">

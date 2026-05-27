@@ -1,4 +1,18 @@
-﻿<!DOCTYPE html>
+﻿<?php
+// Fetch live stats from DB for the hero section
+// Wrapped in try/catch so the page still loads if DB is unavailable
+$_stat_employees  = '0';
+$_stat_payslips   = '0';
+$_stat_periods    = '0';
+try {
+    require_once 'database/db_connect.php';
+    $_pdo = getDB();
+    $_stat_employees = (int)$_pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'active'")->fetchColumn();
+    $_stat_payslips  = (int)$_pdo->query("SELECT COUNT(*) FROM payslips")->fetchColumn();
+    $_stat_periods   = (int)$_pdo->query("SELECT COUNT(*) FROM payroll_periods WHERE status IN ('verified','finalized')")->fetchColumn();
+} catch (Throwable $e) { /* DB not ready — keep zeros */ }
+?>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -71,23 +85,6 @@
                     <i class="fas fa-info-circle"></i> Learn More
                 </a>
             </div>
-            <!-- Quick Stats -->
-            <div class="hero-stats">
-                <div class="hero-stat">
-                    <span class="hero-stat-num">135+</span>
-                    <span class="hero-stat-label">Staff Members</span>
-                </div>
-                <div class="hero-stat-divider"></div>
-                <div class="hero-stat">
-                    <span class="hero-stat-num">4</span>
-                    <span class="hero-stat-label">User Roles</span>
-                </div>
-                <div class="hero-stat-divider"></div>
-                <div class="hero-stat">
-                    <span class="hero-stat-num">100%</span>
-                    <span class="hero-stat-label">Automated</span>
-                </div>
-            </div>
         </div>
         <div class="hero-visual">
             <div class="dashboard-mockup">
@@ -98,45 +95,17 @@
                     <span class="mockup-title">BiT Payroll Dashboard</span>
                 </div>
                 <div class="mockup-body">
-                    <div class="mockup-stat-row">
-                        <div class="mockup-stat blue">
-                            <i class="fas fa-users"></i>
-                            <div>
-                                <p>Total Staff</p>
-                                <h3>135</h3>
-                            </div>
+                    <div class="mockup-welcome-content">
+                        <div class="mockup-welcome-icon">
+                            <i class="fas fa-university"></i>
                         </div>
-                        <div class="mockup-stat green">
-                            <i class="fas fa-money-bill-wave"></i>
-                            <div>
-                                <p>Monthly Payout</p>
-                                <h3>ETB 1.69M</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mockup-stat-row">
-                        <div class="mockup-stat orange">
-                            <i class="fas fa-file-invoice"></i>
-                            <div>
-                                <p>Payslips Generated</p>
-                                <h3>135</h3>
-                            </div>
-                        </div>
-                        <div class="mockup-stat purple">
-                            <i class="fas fa-shield-alt"></i>
-                            <div>
-                                <p>Tax Compliance</p>
-                                <h3>100%</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mockup-bar-section">
-                        <p>Payroll Processing</p>
-                        <div class="mockup-bar"><div class="mockup-bar-fill" style="width:97%"></div></div>
-                        <p>Tax Calculation</p>
-                        <div class="mockup-bar"><div class="mockup-bar-fill" style="width:100%"></div></div>
-                        <p>Payslip Generation</p>
-                        <div class="mockup-bar"><div class="mockup-bar-fill" style="width:88%"></div></div>
+                        <h2 class="mockup-welcome-title">Welcome to BiT Web-Based Payroll Management</h2>
+                        <p class="mockup-welcome-desc">
+                            Your personal, secure space for tracking staff salaries, allowances, 
+        Ethiopian tax calculations, pension contributions, and generating digital payslips 
+        &mdash; all in one place.
+                        </p>
+                        
                     </div>
                 </div>
             </div>

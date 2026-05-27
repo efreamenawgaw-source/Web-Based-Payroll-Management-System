@@ -18,8 +18,8 @@ $rates = $pdo->query("
     WHERE  setting_key IN ('credit_association_rate','renaissance_dam_rate')
 ")->fetchAll(PDO::FETCH_KEY_PAIR);
 
-$CREDIT_RATE = (float)($rates['credit_association_rate'] ?? 0.10); // default 10%
-$GERD_RATE   = (float)($rates['renaissance_dam_rate']    ?? 0.01); // default 1%
+$CREDIT_RATE = (float)($rates['credit_association_rate'] ?? 0.00); // default 0%
+$GERD_RATE   = (float)($rates['renaissance_dam_rate']    ?? 0.00); // default 0%
 
 $selected_emp_id = trim($_GET['emp'] ?? '');
 $f_month = (int)($_GET['month'] ?? $cur_month);
@@ -303,8 +303,8 @@ require_once $depth . 'includes/header.php';
                     $default_gerd   = round($basic * $GERD_RATE,   2);
 
                     $ded_fields = [
-                        ['credit_association', 'Credit Association (10% of basic)',          'fas fa-handshake',          'var(--info)',     'Default: 10% of basic salary',  $default_credit],
-                        ['renaissance_dam',    'Renaissance Dam &mdash; GERD (1% of basic)', 'fas fa-water',              'var(--primary)', 'Default: 1% of basic salary',    $default_gerd],
+                        ['credit_association', 'Credit Association',                          'fas fa-handshake',          'var(--info)',     'Default: 0% (enter amount manually)',  $default_credit],
+                        ['renaissance_dam',    'Renaissance Dam &mdash; GERD',               'fas fa-water',              'var(--primary)', 'Default: 0% (enter amount manually)',  $default_gerd],
                         ['loan_repayment',     'Loan Repayment',                             'fas fa-hand-holding-usd',   'var(--warning)', 'Monthly loan installment',       0],
                         ['penalty',            'Penalty / Absence',                          'fas fa-exclamation-triangle','var(--danger)', 'Penalty or absence deduction',   0],
                         ['other',              'Other Deduction',                            'fas fa-minus-circle',       'var(--gray-600)','Any other deduction',            0],

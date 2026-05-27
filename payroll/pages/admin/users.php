@@ -408,9 +408,9 @@ if (!empty($_GET['edit'])) {
     $edit_user = $es->fetch();
 }
 
-// Load unlinked employees (no user_id) for linking dropdown
+// Load unlinked employees (no user_id) for linking dropdown + pending banner
 $unlinked_employees = $pdo->query("
-    SELECT emp_id, full_name, position FROM employees
+    SELECT emp_id, full_name, position, email FROM employees
     WHERE user_id IS NULL AND status = 'active'
     ORDER BY full_name
 ")->fetchAll();
@@ -443,6 +443,68 @@ require_once $depth . 'includes/header.php';
 <div class="alert alert-success"><i class="fas fa-check-circle"></i> <span><?= $success ?></span></div>
 <?php endif; ?>
 <?php if ($error): ?>
+
+<?php if (!empty($unlinked_employees)): ?>
+<!-- ── Pending User Accounts Banner ── -->
+<div class="card mb-3" style="border:2px solid var(--warning);">
+    <div class="card-header" style="background:var(--warning-light);">
+        <h3 style="color:var(--warning);margin:0;">
+            <i class="fas fa-user-clock"></i>
+            Employees Without a User Account
+            <span class="badge badge-warning" style="margin-left:8px;"><?= count($unlinked_employees) ?></span>
+        </h3>
+        <p style="font-size:0.8rem;color:var(--gray-600);margin:4px 0 0;">
+            These employees were registered by HR but have no login account yet.
+            Use their details below to create an account, then link it to their employee record.
+        </p>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Employee ID</th>
+                        <th>Full Name</th>
+                        <th>Position</th>
+                        <th>Email (use for account)</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($unlinked_employees as $ue): ?>
+                    <tr>
+                        <td><span class="badge badge-primary"><?= htmlspecialchars($ue['emp_id']) ?></span></td>
+                        <td><strong><?= htmlspecialchars($ue['full_name']) ?></strong></td>
+                        <td class="text-muted"><?= htmlspecialchars($ue['position']) ?></td>
+                        <td>
+                            <?php if ($ue['email']): ?>
+                            <span style="font-family:monospace;font-size:0.88rem;color:var(--info);">
+                                <?= htmlspecialchars($ue['email']) ?>
+                            </span>
+                            <?php else: ?>
+                            <span class="text-muted" style="font-size:0.82rem;">
+                                <i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i>
+                                No email on file
+                            </span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <button class="btn btn-primary btn-sm"
+                                    onclick="prefillUser(
+                                        <?= htmlspecialchars(json_encode($ue['full_name'])) ?>,
+                                        <?= htmlspecialchars(json_encode($ue['email'] ?? '')) ?>
+                                    )">
+                                <i class="fas fa-user-plus"></i> Create Account
+                            </button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <span><?= $error ?></span></div>
 <?php endif; ?>
 
@@ -889,6 +951,31 @@ function generatePassword() {
         // Hide after 3 seconds
         setTimeout(() => { if (input.type === 'text') input.type = 'password'; }, 3000);
     }
+}
+
+// Pre-fill the Add User modal with employee name & email from the pending banner
+function prefillUser(fullName, email) {
+    // Open the modal
+    openModal('addUserModal');
+
+    // Fill full name
+    const nameInput = document.querySelector('#addUserModal input[name="full_name"]');
+    if (nameInput) nameInput.value = fullName;
+
+    // Fill email
+    const emailInput = document.querySelector('#addUserModal input[name="email"]');
+    if (emailInput) emailInput.value = email;
+
+    // Auto-suggest username from first name
+    const usernameInput = document.querySelector('#addUserModal input[name="username"]');
+    if (usernameInput && !usernameInput.value) {
+        const first = fullName.trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+        usernameInput.value = first;
+    }
+
+    // Set role to employee
+    const roleSelect = document.querySelector('#addUserModal select[name="role"]');
+    if (roleSelect) roleSelect.value = 'employee';
 }
 </script>
 

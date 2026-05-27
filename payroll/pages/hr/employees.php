@@ -61,8 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_employee'])) {
     if (!in_array($position, $valid_positions, true))
         $errs[] = 'Please select a valid position.';
 
-    if ($basic_salary <= 0)
-        $errs[] = 'Basic salary must be greater than 0.';
+    if ($basic_salary < 0)
+        $errs[] = 'Basic salary cannot be negative.';
     elseif ($basic_salary > 500000)
         $errs[] = 'Basic salary seems too high. Please verify.';
 
@@ -584,7 +584,7 @@ require_once $depth . 'includes/header.php';
                         <label class="form-label">Basic Salary (ETB) *</label>
                         <input type="number" name="basic_salary" class="form-control"
                                value="<?= $edit_emp['basic_salary'] ?>"
-                               min="1" step="0.01" required>
+                               min="0" step="0.01" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Employment Type</label>

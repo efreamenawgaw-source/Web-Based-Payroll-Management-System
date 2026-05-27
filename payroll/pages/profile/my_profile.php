@@ -37,6 +37,21 @@ $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch();
 
 // ============================================================
+// HANDLE: Remove profile photo
+// ============================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_photo'])) {
+    if ($user['profile_photo']) {
+        $old = $uploads_fs . $user['profile_photo'];
+        if (file_exists($old)) unlink($old);
+    }
+    $pdo->prepare("UPDATE users SET profile_photo = NULL WHERE user_id = ?")
+        ->execute([$user_id]);
+    $_SESSION['profile_photo'] = null;
+    $user['profile_photo']     = null;
+    $success = 'Profile photo removed successfully.';
+}
+
+// ============================================================
 // HANDLE: Profile photo upload
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_photo'])) {
@@ -261,6 +276,16 @@ require_once $depth . 'includes/header.php';
                         class="btn btn-secondary btn-sm">
                     <i class="fas fa-camera"></i> Change Photo
                 </button>
+                <?php if ($user['profile_photo']): ?>
+                <form method="POST" style="display:inline;"
+                      onsubmit="return confirm('Remove your profile photo?');">
+                    <input type="hidden" name="remove_photo" value="1">
+                    <button type="submit" class="btn btn-danger btn-sm"
+                            style="margin-left:8px;">
+                        <i class="fas fa-trash-alt"></i> Remove Photo
+                    </button>
+                </form>
+                <?php endif; ?>
                 <span style="font-size:0.75rem;color:var(--gray-400);margin-left:8px;">
                     JPG, PNG, GIF or WEBP &mdash; max 2 MB
                 </span>
