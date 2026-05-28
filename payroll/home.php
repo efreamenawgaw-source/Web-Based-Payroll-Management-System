@@ -101,9 +101,7 @@ try {
                         </div>
                         <h2 class="mockup-welcome-title">Welcome to BiT Web-Based Payroll Management</h2>
                         <p class="mockup-welcome-desc">
-                            Your personal, secure space for tracking staff salaries, allowances, 
-        Ethiopian tax calculations, pension contributions, and generating digital payslips 
-        &mdash; all in one place.
+                            Your dedicated space to securely view your earnings, track allowances, and access your digital payslips anytime.
                         </p>
                         
                     </div>
