@@ -14,6 +14,9 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
 $pdo = getDB();
 
 // ── Ensure tables exist ────────────────────────────────────
+// contact_messages may already exist with msg_id (from full_setup.sql)
+// or message_id depending on which SQL was run.
+// We normalise to message_id by adding it as an alias if missing.
 $pdo->exec("
     CREATE TABLE IF NOT EXISTS contact_messages (
         message_id   INT          AUTO_INCREMENT PRIMARY KEY,
@@ -28,6 +31,25 @@ $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// If the table was created with msg_id instead of message_id, add message_id as alias
+try {
+    $cols = $pdo->query("SHOW COLUMNS FROM contact_messages LIKE 'message_id'")->fetchAll();
+    if (empty($cols)) {
+        // Table exists but uses msg_id — add message_id as a generated/virtual alias
+        // Simplest fix: just rename msg_id to message_id
+        $pdo->exec("ALTER TABLE contact_messages CHANGE msg_id message_id INT NOT NULL AUTO_INCREMENT");
+    }
+} catch (Throwable $e) { /* column already correct — ignore */ }
+
+// Add replied_at column if missing (full_setup.sql omits it)
+try {
+    $ra = $pdo->query("SHOW COLUMNS FROM contact_messages LIKE 'replied_at'")->fetchAll();
+    if (empty($ra)) {
+        $pdo->exec("ALTER TABLE contact_messages ADD COLUMN replied_at DATETIME NULL DEFAULT NULL");
+    }
+} catch (Throwable $e) { /* already exists — ignore */ }
+
+// contact_replies — no FK constraint so it works regardless of schema version
 $pdo->exec("
     CREATE TABLE IF NOT EXISTS contact_replies (
         reply_id     INT          AUTO_INCREMENT PRIMARY KEY,
@@ -38,7 +60,7 @@ $pdo->exec("
         sent_via     ENUM('email','system') NOT NULL DEFAULT 'email',
         mail_status  VARCHAR(255) NULL,
         created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (message_id) REFERENCES contact_messages(message_id) ON DELETE CASCADE
+        INDEX idx_reply_msg (message_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 

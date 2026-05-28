@@ -350,31 +350,47 @@ if ($f_period_id) {
 
 <!-- Annual summary table: one row per processed month in the current year -->
 <?php if (!empty($annual)): ?>
-<div class="card">
+<?php
+// Pre-calculate year totals for the export
+$ann_gt_export = array_fill_keys(['gross','tax','pen_emp','pen_org','other','net'], 0);
+foreach ($annual as $a) {
+    $ann_gt_export['gross']   += $a['total_gross'];
+    $ann_gt_export['tax']     += $a['total_tax'];
+    $ann_gt_export['pen_emp'] += $a['total_pension_emp'];
+    $ann_gt_export['pen_org'] += $a['total_pension_org'];
+    $ann_gt_export['other']   += $a['total_other'];
+    $ann_gt_export['net']     += $a['total_net'];
+}
+?>
+<div class="card" id="annualSummaryCard">
     <div class="card-header">
         <h3><i class="fas fa-chart-bar" style="color:var(--primary);margin-right:8px"></i>
             Annual Summary &mdash; <?= date('Y') ?>
         </h3>
-        <span class="badge badge-primary"><?= count($annual) ?> months processed</span>
+        <div class="d-flex gap-2" style="align-items:center;">
+            <span class="badge badge-primary"><?= count($annual) ?> months processed</span>
+            <button class="btn btn-success btn-sm" onclick="exportAnnualToExcel()">
+                <i class="fas fa-file-excel"></i> Export to Excel
+            </button>
+        </div>
     </div>
     <div class="card-body" style="padding:0">
         <div class="table-wrapper">
-            <table>
+            <table id="annualTable">
                 <thead>
                     <tr>
                         <th>Month</th>
                         <th>Employees</th>
                         <th>Total Gross (ETB)</th>
                         <th>Total Tax (ETB)</th>
-                        <th>Pension Emp (ETB)</th>
-                        <th>Pension Org (ETB)</th>
+                        <th>Pension Emp 11% (ETB)</th>
+                        <th>Pension Org 18% (ETB)</th>
                         <th>Other Ded. (ETB)</th>
                         <th>Total Net Pay (ETB)</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php
-                    // Accumulate year-to-date totals while rendering each row
                     $ann_gt = array_fill_keys(['gross','tax','pen_emp','pen_org','other','net'], 0);
                     foreach ($annual as $a):
                         $ann_gt['gross']   += $a['total_gross'];
@@ -397,7 +413,6 @@ if ($f_period_id) {
                     <?php endforeach; ?>
                 </tbody>
                 <tfoot>
-                    <!-- Year-to-date totals row -->
                     <tr style="background:var(--bg-light);font-weight:700;">
                         <td style="padding:12px 16px;color:var(--primary);">YEAR TOTAL</td>
                         <td style="padding:12px 16px;"></td>
@@ -413,6 +428,81 @@ if ($f_period_id) {
         </div>
     </div>
 </div>
+
+<script>
+function exportAnnualToExcel() {
+    const year    = '<?= date('Y') ?>';
+    const title   = 'Annual Summary — ' + year;
+    const filename = 'Annual_Summary_' + year + '.xls';
+
+    // Build XLS-compatible HTML table
+    const table = document.getElementById('annualTable');
+
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
+             + 'xmlns:x="urn:schemas-microsoft-com:office:excel" '
+             + 'xmlns="http://www.w3.org/TR/REC-html40">'
+             + '<head><meta charset="UTF-8">'
+             + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>'
+             + '<x:ExcelWorksheet><x:Name>Annual Summary</x:Name>'
+             + '<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
+             + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->'
+             + '<style>'
+             + 'table { border-collapse: collapse; width: 100%; }'
+             + 'th, td { border: 1px solid #999; padding: 6px 10px; font-size: 11pt; }'
+             + 'th { background: #1565C0; color: white; font-weight: bold; text-align: center; }'
+             + '.title-row td { background: #0D47A1; color: white; font-size: 14pt; '
+             + '               font-weight: bold; text-align: center; padding: 12px; }'
+             + '.total-row td { background: #E3F2FD; font-weight: bold; }'
+             + '</style></head><body>';
+
+    // Title row spanning all columns
+    html += '<table>'
+          + '<tr class="title-row"><td colspan="8">' + title + '</td></tr>'
+          + '<tr class="title-row"><td colspan="8">Bahir Dar Institute of Technology &mdash; BiT Payroll System</td></tr>'
+          + '<tr><td colspan="8"></td></tr>'; // blank spacer row
+
+    // Header row
+    html += '<tr>';
+    table.querySelectorAll('thead th').forEach(th => {
+        html += '<th>' + th.innerText + '</th>';
+    });
+    html += '</tr>';
+
+    // Data rows
+    table.querySelectorAll('tbody tr').forEach(tr => {
+        html += '<tr>';
+        tr.querySelectorAll('td').forEach(td => {
+            // Strip commas from numbers so Excel treats them as numbers
+            const val = td.innerText.trim();
+            html += '<td>' + val + '</td>';
+        });
+        html += '</tr>';
+    });
+
+    // Totals row
+    table.querySelectorAll('tfoot tr').forEach(tr => {
+        html += '<tr class="total-row">';
+        tr.querySelectorAll('td').forEach(td => {
+            html += '<td>' + td.innerText.trim() + '</td>';
+        });
+        html += '</tr>';
+    });
+
+    html += '</table></body></html>';
+
+    // Trigger download
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+</script>
+
 <?php else: ?>
 <!-- No payrolls finalized yet for this year -->
 <div class="card">

@@ -34,8 +34,8 @@ if ($employee) {
                pr.housing, pr.transport, pr.position_allowance, pr.teaching,
                COALESCE(wd.working_days, 30) AS working_days
         FROM   payslips ps
-        JOIN   payroll_records pr  ON ps.record_id = pr.record_id
-        JOIN   payroll_periods pp  ON pr.period_id = pp.period_id
+        JOIN   payroll_periods pp  ON ps.period_id = pp.period_id
+        JOIN   payroll_records pr  ON pr.period_id = ps.period_id AND pr.emp_id = ps.emp_id
         LEFT JOIN working_days wd  ON wd.emp_id = ps.emp_id
             AND wd.period_month = pp.period_month
             AND wd.period_year  = pp.period_year
@@ -45,15 +45,17 @@ if ($employee) {
     $ps_stmt->execute([$employee['emp_id']]);
     $payslips = $ps_stmt->fetchAll();
 
-    // View specific payslip
+    // View specific payslip — match by record_id
     if (!empty($_GET['view'])) {
         foreach ($payslips as $ps) {
             if ((int)$ps['record_id'] === (int)$_GET['view']) {
                 $view_record = $ps;
 
-                // Mark as viewed
-                $pdo->prepare("UPDATE payslips SET viewed_at = NOW() WHERE record_id = ? AND viewed_at IS NULL")
-                    ->execute([$ps['record_id']]);
+                // Mark as viewed — use period_id + emp_id since record_id may not exist in payslips
+                $pdo->prepare("
+                    UPDATE payslips SET viewed_at = NOW()
+                    WHERE period_id = ? AND emp_id = ? AND viewed_at IS NULL
+                ")->execute([$ps['period_id'] ?? 0, $employee['emp_id']]);
 
                 // Load deductions breakdown
                 $dv = $pdo->prepare("

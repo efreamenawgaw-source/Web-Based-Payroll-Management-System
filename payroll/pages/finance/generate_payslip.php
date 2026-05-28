@@ -44,7 +44,7 @@ if ($sel_period_id) {
             FROM   payroll_records pr
             JOIN   employees e   ON pr.emp_id = e.emp_id
             JOIN   departments d ON e.dept_id = d.dept_id
-            LEFT JOIN payslips ps ON ps.record_id = pr.record_id
+            LEFT JOIN payslips ps ON ps.period_id = pr.period_id AND ps.emp_id = pr.emp_id
             WHERE  pr.period_id = ?
             ORDER  BY e.full_name
         ");
@@ -67,21 +67,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
 
             $generated = 0;
             foreach ($all_records as $rec) {
-                // Check if payslip already exists
-                $chk = $pdo->prepare("SELECT payslip_id FROM payslips WHERE record_id = ?");
-                $chk->execute([$rec['record_id']]);
+                // Check if payslip already exists for this period + employee
+                $chk = $pdo->prepare("SELECT payslip_id FROM payslips WHERE period_id = ? AND emp_id = ?");
+                $chk->execute([$pid, $rec['emp_id']]);
                 if (!$chk->fetch()) {
                     $pdo->prepare("
-                        INSERT INTO payslips (record_id, emp_id, period_id, generated_by)
-                        VALUES (?, ?, ?, ?)
-                    ")->execute([$rec['record_id'], $rec['emp_id'], $pid, $_SESSION['user_id']]);
+                        INSERT INTO payslips (period_id, emp_id, generated_by)
+                        VALUES (?, ?, ?)
+                    ")->execute([$pid, $rec['emp_id'], $_SESSION['user_id']]);
                     $generated++;
                 }
             }
 
             // Update period status to finalized
             $pdo->prepare("
-                UPDATE payroll_periods SET status = 'finalized', finalized_at = NOW()
+                UPDATE payroll_periods SET status = 'finalized'
                 WHERE period_id = ?
             ")->execute([$pid]);
 
@@ -157,7 +157,7 @@ if (!empty($_GET['view'])) {
         JOIN   employees e   ON pr.emp_id = e.emp_id
         JOIN   departments d ON e.dept_id = d.dept_id
         JOIN   payroll_periods pp ON pr.period_id = pp.period_id
-        LEFT JOIN payslips ps ON ps.record_id = pr.record_id
+        LEFT JOIN payslips ps ON ps.period_id = pr.period_id AND ps.emp_id = pr.emp_id
         LEFT JOIN working_days wd ON wd.emp_id = pr.emp_id
             AND wd.period_month = pp.period_month
             AND wd.period_year  = pp.period_year

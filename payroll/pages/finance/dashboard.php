@@ -76,7 +76,7 @@ $recent_records = $pdo->query("
     FROM   payroll_records pr
     JOIN   employees e        ON pr.emp_id = e.emp_id
     JOIN   payroll_periods pp ON pr.period_id = pp.period_id
-    ORDER  BY pr.calculated_at DESC
+    ORDER  BY pr.created_at DESC
     LIMIT  8
 ")->fetchAll();
 

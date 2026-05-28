@@ -12,10 +12,14 @@ $success = '';
 $error   = '';
 
 // ── Allowed positions & types (whitelist) ─────────────────
-$VALID_ROLES      = ['admin','hr','finance','employee'];
-$VALID_EMP_TYPES  = ['permanent','contract','part_time'];
-$VALID_STATUSES   = ['active','on_leave'];
-$VALID_POSITIONS  = [
+// Admin can only create accounts for admin / hr / finance.
+// Employee accounts are created automatically when HR registers
+// an employee — the admin then links the generated account.
+$VALID_ROLES_CREATE = ['admin','hr','finance'];
+$VALID_ROLES        = ['admin','hr','finance','employee']; // used for UPDATE only
+$VALID_EMP_TYPES    = ['permanent','contract','part_time'];
+$VALID_STATUSES     = ['active','on_leave'];
+$VALID_POSITIONS    = [
     'Professor','Associate Professor','Senior Lecturer','Lecturer',
     'Assistant Lecturer','Administrative Officer','HR Officer',
     'Finance Officer','Technician','Librarian','Security Staff',
@@ -24,13 +28,37 @@ $VALID_POSITIONS  = [
 
 // ── CREATE user ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
-    $full_name = trim($_POST['full_name'] ?? '');
-    $username  = strtolower(trim($_POST['username'] ?? ''));
-    $password  = $_POST['password'] ?? '';          // do NOT trim passwords
-    $role      = trim($_POST['role']      ?? '');
-    $email     = trim($_POST['email']     ?? '') ?: null;
+    $full_name  = trim($_POST['full_name'] ?? '');
+    $username   = strtolower(trim($_POST['username'] ?? ''));
+    $password   = $_POST['password'] ?? '';          // do NOT trim passwords
+    $role       = trim($_POST['role']       ?? '');
+    $email      = trim($_POST['email']      ?? '') ?: null;
+    $link_emp_id = trim($_POST['link_emp_id'] ?? ''); // set when creating from banner
 
     $errs = [];
+
+    // ── Role restriction ──────────────────────────────────
+    // - admin / hr / finance: can always be created directly
+    // - employee: only allowed when a valid unlinked employee record
+    //   is provided via link_emp_id (i.e. created from the banner)
+    if ($role === 'employee') {
+        if (empty($link_emp_id)) {
+            $errs[] = 'Employee accounts must be created from the '
+                    . '<strong>Employees Without a Login Account</strong> banner. '
+                    . 'Ask HR to register the employee first.';
+        } else {
+            // Verify the employee record exists and is not already linked
+            $emp_chk = $pdo->prepare("
+                SELECT emp_id, full_name FROM employees
+                WHERE emp_id = ? AND user_id IS NULL AND status != 'terminated'
+            ");
+            $emp_chk->execute([$link_emp_id]);
+            if (!$emp_chk->fetch()) {
+                $errs[] = 'The selected employee record is invalid, already has a login account, '
+                        . 'or has been terminated.';
+            }
+        }
+    }
 
     // Full name
     if (empty($full_name))
@@ -56,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     elseif (!preg_match('/[0-9]/', $password))
         $errs[] = 'Password must contain at least one number.';
 
-    // Role
+    // Role — admin / hr / finance / employee (employee only via banner)
     if (!in_array($role, $VALID_ROLES, true))
         $errs[] = 'Please select a valid role.';
 
@@ -90,7 +118,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
                 VALUES (?, ?, ?, ?, ?)
             ")->execute([$username, $hash, $role, $full_name, $email]);
 
-            $new_id = $pdo->lastInsertId();
+            $new_id = (int)$pdo->lastInsertId();
+
+            // ── Auto-link employee record if creating an employee account ──
+            if ($role === 'employee' && !empty($link_emp_id)) {
+                $pdo->prepare("UPDATE employees SET user_id = ? WHERE emp_id = ?")
+                    ->execute([$new_id, $link_emp_id]);
+            }
 
             // Audit log
             $pdo->prepare("
@@ -98,12 +132,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
                 VALUES (?, ?, ?, 'Create User', ?, ?, ?)
             ")->execute([
                 $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
-                $username, "Created: {$full_name} | Role: {$role}",
+                $username,
+                "Created: {$full_name} | Role: {$role}"
+                    . ($link_emp_id ? " | Linked to: {$link_emp_id}" : ''),
                 $_SERVER['REMOTE_ADDR'] ?? null
             ]);
 
             $success = "User <strong>" . htmlspecialchars($full_name) . "</strong> ("
-                     . htmlspecialchars($username) . ") created successfully.";
+                     . htmlspecialchars($username) . ") created successfully"
+                     . ($link_emp_id ? " and linked to employee <strong>{$link_emp_id}</strong>" : '')
+                     . ".";
 
             // Store credentials to show on screen (admin can give to user manually)
             $_SESSION['new_user_credentials'] = [
@@ -176,6 +214,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
 
     if (!in_array($role, $VALID_ROLES, true))
         $errs[] = 'Please select a valid role.';
+
+    // If changing role TO employee, the user must already have a linked employee record
+    if ($role === 'employee' && $uid) {
+        $emp_chk = $pdo->prepare("SELECT emp_id FROM employees WHERE user_id = ?");
+        $emp_chk->execute([$uid]);
+        if (!$emp_chk->fetch()) {
+            $errs[] = 'Cannot assign the <strong>Employee</strong> role: this user has no linked '
+                    . 'employee record. Register the employee in HR first, then link the account.';
+        }
+    }
 
     if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL))
         $errs[] = 'Please enter a valid email address.';
@@ -434,7 +482,7 @@ require_once $depth . 'includes/header.php';
         <h1>Manage Users</h1>
         <p>Create, update, and manage system user accounts.</p>
     </div>
-    <button class="btn btn-primary" onclick="openModal('addUserModal')">
+    <button class="btn btn-primary" onclick="openAddUserModal()">
         <i class="fas fa-user-plus"></i> Add New User
     </button>
 </div>
@@ -443,19 +491,21 @@ require_once $depth . 'includes/header.php';
 <div class="alert alert-success"><i class="fas fa-check-circle"></i> <span><?= $success ?></span></div>
 <?php endif; ?>
 <?php if ($error): ?>
+<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <span><?= $error ?></span></div>
+<?php endif; ?>
 
 <?php if (!empty($unlinked_employees)): ?>
-<!-- ── Pending User Accounts Banner ── -->
+<!-- ── Employees Without Login Accounts Banner ── -->
 <div class="card mb-3" style="border:2px solid var(--warning);">
     <div class="card-header" style="background:var(--warning-light);">
         <h3 style="color:var(--warning);margin:0;">
             <i class="fas fa-user-clock"></i>
-            Employees Without a User Account
+            Employees Without a Login Account
             <span class="badge badge-warning" style="margin-left:8px;"><?= count($unlinked_employees) ?></span>
         </h3>
         <p style="font-size:0.8rem;color:var(--gray-600);margin:4px 0 0;">
             These employees were registered by HR but have no login account yet.
-            Use their details below to create an account, then link it to their employee record.
+            Click <strong>Create Login Account</strong> to set up their access.
         </p>
     </div>
     <div class="card-body" style="padding:0;">
@@ -490,11 +540,12 @@ require_once $depth . 'includes/header.php';
                         </td>
                         <td>
                             <button class="btn btn-primary btn-sm"
-                                    onclick="prefillUser(
+                                    onclick="prefillEmployee(
+                                        <?= htmlspecialchars(json_encode($ue['emp_id'])) ?>,
                                         <?= htmlspecialchars(json_encode($ue['full_name'])) ?>,
                                         <?= htmlspecialchars(json_encode($ue['email'] ?? '')) ?>
                                     )">
-                                <i class="fas fa-user-plus"></i> Create Account
+                                <i class="fas fa-user-plus"></i> Create Login Account
                             </button>
                         </td>
                     </tr>
@@ -504,8 +555,6 @@ require_once $depth . 'includes/header.php';
         </div>
     </div>
 </div>
-<?php endif; ?>
-<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <span><?= $error ?></span></div>
 <?php endif; ?>
 
 <!-- Filter Bar -->
@@ -698,10 +747,15 @@ require_once $depth . 'includes/header.php';
      <?= (isset($_POST['create_user']) && $error) ? 'style="opacity:1;pointer-events:all;"' : '' ?>>
     <div class="modal">
         <div class="modal-header">
-            <h3><i class="fas fa-user-plus" style="color:var(--primary);margin-right:8px"></i>Create New User</h3>
-            <button class="modal-close" onclick="closeModal('addUserModal')">&times;</button>
+            <h3><i class="fas fa-user-plus" style="color:var(--primary);margin-right:8px"></i>
+                <span id="addModalTitle">Create New User</span>
+            </h3>
+            <button class="modal-close" onclick="closeAddModal()">&times;</button>
         </div>
         <form method="POST" action="">
+            <!-- Hidden: carries the employee ID when creating from the banner -->
+            <input type="hidden" name="link_emp_id" id="addLinkEmpId" value="">
+
             <div class="modal-body">
 
                 <!-- Email notice -->
@@ -710,12 +764,61 @@ require_once $depth . 'includes/header.php';
                             color:var(--success);border-left:4px solid var(--success);">
                     <i class="fas fa-envelope"></i>
                     <strong>Welcome email</strong> with username &amp; password will be sent
-                    automatically to the employee's Gmail address.
+                    automatically to the provided email address.
+                </div>
+
+                <!-- Role selector — FIRST so the form adapts below it -->
+                <div class="form-group">
+                    <label class="form-label">Role <span style="color:var(--danger)">*</span></label>
+                    <select name="role" id="addRole" class="form-control" required
+                            onchange="onRoleChange(this.value)">
+                        <option value="">— Select Role —</option>
+                        <option value="admin">Administrator</option>
+                        <option value="hr">HR Personnel</option>
+                        <option value="finance">Finance Officer</option>
+                        <option value="employee">Employee</option>
+                    </select>
+                </div>
+
+                <!-- Employee picker — only visible when role = employee -->
+                <div id="empPickerSection" style="display:none;background:var(--warning-light);
+                     border-radius:var(--radius);padding:14px;margin-bottom:14px;
+                     border-left:4px solid var(--warning);">
+                    <p style="font-size:0.82rem;font-weight:700;color:var(--warning);margin:0 0 8px;">
+                        <i class="fas fa-id-badge"></i>
+                        Select the employee to create a login account for:
+                    </p>
+                    <select id="empPickerSelect" class="form-control"
+                            onchange="onEmployeePicked(this)">
+                        <option value="">— Select Employee —</option>
+                        <?php foreach ($unlinked_employees as $ue): ?>
+                        <option value="<?= htmlspecialchars($ue['emp_id']) ?>"
+                                data-name="<?= htmlspecialchars($ue['full_name']) ?>"
+                                data-email="<?= htmlspecialchars($ue['email'] ?? '') ?>">
+                            <?= htmlspecialchars($ue['emp_id']) ?> —
+                            <?= htmlspecialchars($ue['full_name']) ?>
+                            (<?= htmlspecialchars($ue['position']) ?>)
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php if (empty($unlinked_employees)): ?>
+                    <p style="font-size:0.8rem;color:var(--gray-600);margin:8px 0 0;">
+                        <i class="fas fa-info-circle"></i>
+                        No employees without a login account. Ask HR to register employees first.
+                    </p>
+                    <?php endif; ?>
+                    <div id="empPickedInfo" style="display:none;margin-top:10px;padding:8px 12px;
+                         background:var(--success-light);border-radius:6px;font-size:0.82rem;
+                         color:var(--success);">
+                        <i class="fas fa-check-circle"></i>
+                        Account will be <strong>automatically linked</strong> to
+                        <strong id="empPickedName"></strong>.
+                    </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Full Name <span style="color:var(--danger)">*</span></label>
-                    <input type="text" name="full_name" class="form-control"
+                    <input type="text" name="full_name" id="addFullName" class="form-control"
                            placeholder="e.g. Admasu Dejene"
                            minlength="2" maxlength="100" required>
                 </div>
@@ -727,31 +830,19 @@ require_once $depth . 'includes/header.php';
                             — welcome email sent here
                         </span>
                     </label>
-                    <input type="email" name="email" class="form-control"
-                           placeholder="employee@gmail.com" maxlength="180" required>
+                    <input type="email" name="email" id="addEmail" class="form-control"
+                           placeholder="user@gmail.com" maxlength="180" required>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Username <span style="color:var(--danger)">*</span></label>
-                        <input type="text" name="username" class="form-control"
-                               placeholder="e.g. admasu.d"
-                               minlength="3" maxlength="30"
-                               pattern="[a-z0-9_\.]+"
-                               title="Lowercase letters, numbers, underscores and dots only"
-                               required>
-                        <span class="form-hint">Lowercase letters, numbers, underscores and dots only</span>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Role <span style="color:var(--danger)">*</span></label>
-                        <select name="role" class="form-control" required>
-                            <option value="">Select Role</option>
-                            <option value="admin">Administrator</option>
-                            <option value="hr">HR Personnel</option>
-                            <option value="finance">Finance Officer</option>
-                            <option value="employee">Employee</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label">Username <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="username" id="addUsername" class="form-control"
+                           placeholder="e.g. admasu.d"
+                           minlength="3" maxlength="30"
+                           pattern="[a-z0-9_\.]+"
+                           title="Lowercase letters, numbers, underscores and dots only"
+                           required>
+                    <span class="form-hint">Lowercase letters, numbers, underscores and dots only</span>
                 </div>
 
                 <div class="form-group">
@@ -777,14 +868,14 @@ require_once $depth . 'includes/header.php';
                     </div>
                     <span class="form-hint">
                         Min. 8 characters with at least 1 uppercase letter and 1 number.
-                        The employee will receive this password by email.
+                        The user will receive this password by email.
                     </span>
                 </div>
 
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary"
-                        onclick="closeModal('addUserModal')">Cancel</button>
+                        onclick="closeAddModal()">Cancel</button>
                 <button type="submit" name="create_user" class="btn btn-primary">
                     <i class="fas fa-user-plus"></i> Create &amp; Send Welcome Email
                 </button>
@@ -828,6 +919,12 @@ require_once $depth . 'includes/header.php';
                             <option value="finance"  <?= $edit_user['role']==='finance'  ?'selected':'' ?>>Finance Officer</option>
                             <option value="employee" <?= $edit_user['role']==='employee' ?'selected':'' ?>>Employee</option>
                         </select>
+                        <?php if ($edit_user['role'] !== 'employee'): ?>
+                        <span class="form-hint">
+                            <i class="fas fa-info-circle" style="color:var(--warning);"></i>
+                            Assigning <strong>Employee</strong> role requires a linked employee record.
+                        </span>
+                        <?php endif; ?>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Status</label>
@@ -921,8 +1018,7 @@ require_once $depth . 'includes/header.php';
 <?php endif; ?>
 
 <script>
-// Generate a strong random password that meets validation rules:
-// min 8 chars, at least 1 uppercase, 1 number, 1 special char
+// ── Generate a strong random password ─────────────────────
 function generatePassword() {
     const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
     const lower   = 'abcdefghjkmnpqrstuvwxyz';
@@ -930,52 +1026,138 @@ function generatePassword() {
     const special = '@#$!';
     const all     = upper + lower + digits + special;
 
-    // Guarantee at least one of each required type
     let pass = [
         upper.charAt(Math.floor(Math.random() * upper.length)),
         digits.charAt(Math.floor(Math.random() * digits.length)),
         special.charAt(Math.floor(Math.random() * special.length)),
     ];
-    // Fill remaining 7 chars from all
     for (let i = 0; i < 7; i++) {
         pass.push(all.charAt(Math.floor(Math.random() * all.length)));
     }
-    // Shuffle
     pass = pass.sort(() => Math.random() - 0.5).join('');
 
     const input = document.getElementById('newUserPass');
     if (input) {
         input.value = pass;
-        input.type  = 'text';   // show generated password briefly
+        input.type  = 'text';
         input.focus();
-        // Hide after 3 seconds
         setTimeout(() => { if (input.type === 'text') input.type = 'password'; }, 3000);
     }
 }
 
-// Pre-fill the Add User modal with employee name & email from the pending banner
-function prefillUser(fullName, email) {
-    // Open the modal
+// ── Open modal in STAFF mode (Admin / HR / Finance) ───────
+function openAddUserModal() {
+    resetAddModal();
     openModal('addUserModal');
+}
 
-    // Fill full name
-    const nameInput = document.querySelector('#addUserModal input[name="full_name"]');
-    if (nameInput) nameInput.value = fullName;
+// ── Open modal in EMPLOYEE mode (from banner) ─────────────
+// empId    : e.g. "BIT-0012"
+// fullName : employee's full name
+// email    : employee's email (may be empty)
+function prefillEmployee(empId, fullName, email) {
+    resetAddModal();
 
-    // Fill email
-    const emailInput = document.querySelector('#addUserModal input[name="email"]');
-    if (emailInput) emailInput.value = email;
-
-    // Auto-suggest username from first name
-    const usernameInput = document.querySelector('#addUserModal input[name="username"]');
-    if (usernameInput && !usernameInput.value) {
-        const first = fullName.trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-        usernameInput.value = first;
+    // Set role to Employee — this triggers onRoleChange which shows the picker
+    const roleSelect = document.getElementById('addRole');
+    if (roleSelect) {
+        roleSelect.value = 'employee';
+        onRoleChange('employee');
     }
 
-    // Set role to employee
-    const roleSelect = document.querySelector('#addUserModal select[name="role"]');
-    if (roleSelect) roleSelect.value = 'employee';
+    // Pre-select the matching employee in the picker dropdown
+    const picker = document.getElementById('empPickerSelect');
+    if (picker) {
+        for (let i = 0; i < picker.options.length; i++) {
+            if (picker.options[i].value === empId) {
+                picker.selectedIndex = i;
+                break;
+            }
+        }
+        onEmployeePicked(picker);
+    }
+
+    openModal('addUserModal');
+}
+
+// ── Reset modal back to default state ─────────────────────
+function resetAddModal() {
+    ['addFullName','addEmail','addUsername','newUserPass'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const passEl = document.getElementById('newUserPass');
+    if (passEl) passEl.type = 'password';
+
+    document.getElementById('addLinkEmpId').value = '';
+
+    const roleSelect = document.getElementById('addRole');
+    if (roleSelect) { roleSelect.value = ''; roleSelect.disabled = false; }
+
+    const section = document.getElementById('empPickerSection');
+    if (section) section.style.display = 'none';
+
+    const picker = document.getElementById('empPickerSelect');
+    if (picker) picker.value = '';
+
+    const info = document.getElementById('empPickedInfo');
+    if (info) info.style.display = 'none';
+
+    document.getElementById('addModalTitle').textContent = 'Create New User';
+}
+
+// ── Close the Add User modal and reset it ─────────────────
+function closeAddModal() {
+    closeModal('addUserModal');
+    resetAddModal();
+}
+
+// ── Show/hide employee picker when role changes ────────────
+function onRoleChange(role) {
+    const section = document.getElementById('empPickerSection');
+    const title   = document.getElementById('addModalTitle');
+    if (role === 'employee') {
+        section.style.display = 'block';
+        title.textContent     = 'Create Employee Login Account';
+        // Clear fields — will be filled by employee picker
+        document.getElementById('addFullName').value  = '';
+        document.getElementById('addEmail').value     = '';
+        document.getElementById('addUsername').value  = '';
+        document.getElementById('addLinkEmpId').value = '';
+        document.getElementById('empPickedInfo').style.display = 'none';
+        document.getElementById('empPickerSelect').value       = '';
+    } else {
+        section.style.display = 'none';
+        title.textContent     = 'Create New User';
+        document.getElementById('addLinkEmpId').value = '';
+    }
+}
+
+// ── Auto-fill form when an employee is picked ─────────────
+function onEmployeePicked(select) {
+    const opt      = select.options[select.selectedIndex];
+    const empId    = opt.value;
+    const fullName = opt.dataset.name  || '';
+    const email    = opt.dataset.email || '';
+
+    if (!empId) {
+        document.getElementById('empPickedInfo').style.display = 'none';
+        document.getElementById('addLinkEmpId').value = '';
+        return;
+    }
+
+    // Fill hidden field and form inputs
+    document.getElementById('addLinkEmpId').value = empId;
+    document.getElementById('addFullName').value  = fullName;
+    document.getElementById('addEmail').value     = email;
+
+    // Auto-suggest username
+    const first = fullName.trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    document.getElementById('addUsername').value = first;
+
+    // Show confirmation
+    document.getElementById('empPickedName').textContent       = fullName + ' (' + empId + ')';
+    document.getElementById('empPickedInfo').style.display     = 'block';
 }
 </script>
 

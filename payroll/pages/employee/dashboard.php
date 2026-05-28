@@ -40,8 +40,8 @@ $latest_ps = $pdo->prepare("
            pr.other_deductions, pr.net_pay, pr.tax_bracket,
            COALESCE(wd.working_days, 30) AS working_days
     FROM   payslips ps
-    JOIN   payroll_records pr  ON ps.record_id = pr.record_id
-    JOIN   payroll_periods pp  ON pr.period_id = pp.period_id
+    JOIN   payroll_periods pp  ON ps.period_id = pp.period_id
+    JOIN   payroll_records pr  ON pr.period_id = ps.period_id AND pr.emp_id = ps.emp_id
     LEFT JOIN working_days wd  ON wd.emp_id = ps.emp_id
         AND wd.period_month = pp.period_month
         AND wd.period_year  = pp.period_year
@@ -82,8 +82,8 @@ $recent_ps = $pdo->prepare("
            pr.record_id, pr.gross_salary, pr.net_pay,
            pr.income_tax, pr.pension_employee
     FROM   payslips ps
-    JOIN   payroll_records pr ON ps.record_id = pr.record_id
-    JOIN   payroll_periods pp ON pr.period_id = pp.period_id
+    JOIN   payroll_periods pp ON ps.period_id = pp.period_id
+    JOIN   payroll_records pr ON pr.period_id = ps.period_id AND pr.emp_id = ps.emp_id
     WHERE  ps.emp_id = ?
     ORDER  BY pp.period_year DESC, pp.period_month DESC
     LIMIT  5
@@ -100,8 +100,8 @@ $annual = $pdo->prepare("
         SUM(pr.pension_employee) AS total_pension,
         COUNT(ps.payslip_id)     AS months_paid
     FROM   payslips ps
-    JOIN   payroll_records pr ON ps.record_id = pr.record_id
-    JOIN   payroll_periods pp ON pr.period_id = pp.period_id
+    JOIN   payroll_periods pp ON ps.period_id = pp.period_id
+    JOIN   payroll_records pr ON pr.period_id = ps.period_id AND pr.emp_id = ps.emp_id
     WHERE  ps.emp_id = ?
     AND    pp.period_year = ?
 ");

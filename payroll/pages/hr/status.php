@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
             // Update employee status
             $pdo->prepare("
                 UPDATE employees
-                SET    status = ?, status_updated_at = NOW()
+                SET    status = ?
                 WHERE  emp_id = ?
             ")->execute([$new_status, $emp_id]);
 
@@ -129,7 +129,7 @@ $employees = $pdo->query("
 $sel_emp = null;
 if ($selected_emp_id) {
     $s = $pdo->prepare("
-        SELECT e.emp_id, e.full_name, e.status, e.status_updated_at,
+        SELECT e.emp_id, e.full_name, e.status,
                d.dept_name, e.position
         FROM   employees e
         JOIN   departments d ON e.dept_id = d.dept_id

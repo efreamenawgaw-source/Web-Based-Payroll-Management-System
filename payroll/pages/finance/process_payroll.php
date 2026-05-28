@@ -93,6 +93,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_payroll'])) {
     if (!$period_label || !$period_month || !$period_year) {
         $error = 'Please select a payroll period.';
     } else {
+        // ── Check if this period has already been processed ──
+        $already = $pdo->prepare("
+            SELECT period_id, status FROM payroll_periods
+            WHERE period_month = ? AND period_year = ?
+        ");
+        $already->execute([$period_month, $period_year]);
+        $existing_check = $already->fetch();
+
+        if ($existing_check) {
+            $status_label = match($existing_check['status']) {
+                'processed' => '✅ Processed — awaiting verification',
+                'verified'  => '✅ Verified — ready for payslip generation',
+                'finalized' => '✅ Finalized — payslips already generated',
+                default     => ucfirst($existing_check['status']),
+            };
+            $next_action = match($existing_check['status']) {
+                'processed' => '<a href="verify_payroll.php?period_id=' . $existing_check['period_id'] . '" class="btn btn-success btn-sm" style="margin-left:10px;"><i class="fas fa-check-double"></i> Go to Verify Payroll</a>',
+                'verified'  => '<a href="generate_payslip.php?period_id=' . $existing_check['period_id'] . '" class="btn btn-primary btn-sm" style="margin-left:10px;"><i class="fas fa-file-invoice-dollar"></i> Go to Generate Payslips</a>',
+                'finalized' => '<a href="generate_payslip.php?period_id=' . $existing_check['period_id'] . '" class="btn btn-secondary btn-sm" style="margin-left:10px;"><i class="fas fa-eye"></i> View Payslips</a>',
+                default     => '',
+            };
+            $error = 'Payroll for <strong>' . htmlspecialchars($period_label) . '</strong> has already been processed.'
+                   . '<br><span style="font-size:0.88rem;">Current status: <strong>' . $status_label . '</strong></span>'
+                   . $next_action;
+        } else {
         // Load all active employees with their current allowances
         $emp_stmt = $pdo->query("
             SELECT
@@ -217,6 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_payroll'])) {
                          . count($results) . ' employees. Review the table below and confirm to save.';
             }
         }
+        } // end else (period not yet processed)
     }
 }
 
@@ -244,14 +270,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payroll'])) {
                 $period_id = $existing_period['period_id'];
                 $pdo->prepare("
                     UPDATE payroll_periods
-                    SET status = 'processed', processed_by = ?, processed_at = NOW()
+                    SET status = 'processed'
                     WHERE period_id = ?
-                ")->execute([$_SESSION['user_id'], $period_id]);
+                ")->execute([$period_id]);
             } else {
                 $pdo->prepare("
                     INSERT INTO payroll_periods
-                        (period_label, period_month, period_year, status, processed_by, processed_at)
-                    VALUES (?, ?, ?, 'processed', ?, NOW())
+                        (period_label, period_month, period_year, status, created_by)
+                    VALUES (?, ?, ?, 'processed', ?)
                 ")->execute([$period_label, $period_month, $period_year, $_SESSION['user_id']]);
                 $period_id = (int)$pdo->lastInsertId();
             }

@@ -13,13 +13,11 @@ $error   = '';
 // -- Load all processed payroll periods --
 $periods = $pdo->query("
     SELECT pp.period_id, pp.period_label, pp.period_month, pp.period_year,
-           pp.status, pp.processed_at,
-           u.full_name AS processed_by_name,
+           pp.status,
            COUNT(pr.record_id) AS emp_count,
            SUM(pr.gross_salary) AS total_gross,
            SUM(pr.net_pay)      AS total_net
     FROM   payroll_periods pp
-    LEFT JOIN users u          ON pp.processed_by = u.user_id
     LEFT JOIN payroll_records pr ON pp.period_id = pr.period_id
     WHERE  pp.status IN ('processed','verified','finalized')
     GROUP  BY pp.period_id
@@ -64,9 +62,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve'])) {
             // Mark the period as verified
             $pdo->prepare("
                 UPDATE payroll_periods
-                SET status = 'verified', verified_by = ?, verified_at = NOW()
+                SET status = 'verified'
                 WHERE period_id = ? AND status = 'processed'
-            ")->execute([$_SESSION['user_id'], $pid]);
+            ")->execute([$pid]);
 
             // Write audit log entry
             $pdo->prepare("
