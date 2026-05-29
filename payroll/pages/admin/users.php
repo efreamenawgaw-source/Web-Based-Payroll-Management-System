@@ -8,8 +8,12 @@ require_once $depth . 'includes/notify.php';
 require_once $depth . 'includes/mailer.php';
 
 $pdo     = getDB();
-$success = '';
-$error   = '';
+
+// ── PRG: pull flash messages from session ─────────────────
+$success = $_SESSION['flash_success'] ?? '';
+$error   = $_SESSION['flash_error']   ?? '';
+$_form   = $_SESSION['flash_form']    ?? [];   // repopulate modal on error
+unset($_SESSION['flash_success'], $_SESSION['flash_error'], $_SESSION['flash_form']);
 
 // ── Allowed positions & types (whitelist) ─────────────────
 // Admin can only create accounts for admin / hr / finance.
@@ -28,39 +32,32 @@ $VALID_POSITIONS    = [
 
 // ── CREATE user ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
-    $full_name  = trim($_POST['full_name'] ?? '');
-    $username   = strtolower(trim($_POST['username'] ?? ''));
-    $password   = $_POST['password'] ?? '';          // do NOT trim passwords
-    $role       = trim($_POST['role']       ?? '');
-    $email      = trim($_POST['email']      ?? '') ?: null;
-    $link_emp_id = trim($_POST['link_emp_id'] ?? ''); // set when creating from banner
+    $full_name   = trim($_POST['full_name']   ?? '');
+    $username    = strtolower(trim($_POST['username'] ?? ''));
+    $password    = $_POST['password']         ?? '';   // do NOT trim passwords
+    $role        = trim($_POST['role']        ?? '');
+    $email       = trim($_POST['email']       ?? '') ?: null;
+    $link_emp_id = trim($_POST['link_emp_id'] ?? '');
 
     $errs = [];
 
-    // ── Role restriction ──────────────────────────────────
-    // - admin / hr / finance: can always be created directly
-    // - employee: only allowed when a valid unlinked employee record
-    //   is provided via link_emp_id (i.e. created from the banner)
     if ($role === 'employee') {
         if (empty($link_emp_id)) {
             $errs[] = 'Employee accounts must be created from the '
                     . '<strong>Employees Without a Login Account</strong> banner. '
                     . 'Ask HR to register the employee first.';
         } else {
-            // Verify the employee record exists and is not already linked
             $emp_chk = $pdo->prepare("
-                SELECT emp_id, full_name FROM employees
+                SELECT emp_id FROM employees
                 WHERE emp_id = ? AND user_id IS NULL AND status != 'terminated'
             ");
             $emp_chk->execute([$link_emp_id]);
-            if (!$emp_chk->fetch()) {
+            if (!$emp_chk->fetch())
                 $errs[] = 'The selected employee record is invalid, already has a login account, '
                         . 'or has been terminated.';
-            }
         }
     }
 
-    // Full name
     if (empty($full_name))
         $errs[] = 'Full name is required.';
     elseif (strlen($full_name) < 2 || strlen($full_name) > 100)
@@ -68,7 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     elseif (!preg_match('/^[\p{L}\s\'\-\.]+$/u', $full_name))
         $errs[] = 'Full name may only contain letters, spaces, hyphens, apostrophes, and dots.';
 
-    // Username
     if (empty($username))
         $errs[] = 'Username is required.';
     elseif (strlen($username) < 3 || strlen($username) > 30)
@@ -76,7 +72,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     elseif (!preg_match('/^[a-z0-9_\.]+$/', $username))
         $errs[] = 'Username may only contain lowercase letters, numbers, underscores, and dots.';
 
-    // Password
     if (strlen($password) < 8)
         $errs[] = 'Password must be at least 8 characters.';
     elseif (!preg_match('/[A-Z]/', $password))
@@ -84,24 +79,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     elseif (!preg_match('/[0-9]/', $password))
         $errs[] = 'Password must contain at least one number.';
 
-    // Role — admin / hr / finance / employee (employee only via banner)
     if (!in_array($role, $VALID_ROLES, true))
         $errs[] = 'Please select a valid role.';
 
-    // Email (optional but must be valid if provided)
     if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL))
         $errs[] = 'Please enter a valid email address.';
     elseif ($email !== null && strlen($email) > 180)
         $errs[] = 'Email address is too long (max 180 characters).';
 
     if (empty($errs)) {
-        // Check duplicate username
         $chk = $pdo->prepare("SELECT user_id FROM users WHERE username = ?");
         $chk->execute([$username]);
         if ($chk->fetch())
             $errs[] = 'Username <strong>' . htmlspecialchars($username) . '</strong> already exists.';
 
-        // Check duplicate email
         if ($email) {
             $echk = $pdo->prepare("SELECT user_id FROM users WHERE email = ?");
             $echk->execute([$email]);
@@ -120,13 +111,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
 
             $new_id = (int)$pdo->lastInsertId();
 
-            // ── Auto-link employee record if creating an employee account ──
             if ($role === 'employee' && !empty($link_emp_id)) {
                 $pdo->prepare("UPDATE employees SET user_id = ? WHERE emp_id = ?")
                     ->execute([$new_id, $link_emp_id]);
             }
 
-            // Audit log
             $pdo->prepare("
                 INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
                 VALUES (?, ?, ?, 'Create User', ?, ?, ?)
@@ -138,12 +127,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
                 $_SERVER['REMOTE_ADDR'] ?? null
             ]);
 
-            $success = "User <strong>" . htmlspecialchars($full_name) . "</strong> ("
-                     . htmlspecialchars($username) . ") created successfully"
-                     . ($link_emp_id ? " and linked to employee <strong>{$link_emp_id}</strong>" : '')
-                     . ".";
+            $flash_success = "User <strong>" . htmlspecialchars($full_name) . "</strong> ("
+                           . htmlspecialchars($username) . ") created successfully"
+                           . ($link_emp_id ? " and linked to employee <strong>{$link_emp_id}</strong>" : '')
+                           . ".";
 
-            // Store credentials to show on screen (admin can give to user manually)
             $_SESSION['new_user_credentials'] = [
                 'full_name' => $full_name,
                 'username'  => $username,
@@ -152,7 +140,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
                 'email'     => $email,
             ];
 
-            // Try to send welcome email — but don't block if it fails
             if ($email) {
                 try {
                     $login_url = (isset($_SERVER['HTTPS']) ? 'https' : 'http')
@@ -166,33 +153,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
                         $html);
 
                     if ($mail_result['success']) {
-                        $success .= ' <span style="color:var(--success);">✉️ Welcome email sent to '
-                                  . htmlspecialchars($email) . '</span>';
-                        // Email sent — no need to show credentials on screen
+                        $flash_success .= ' <span style="color:var(--success);">✉️ Welcome email sent to '
+                                        . htmlspecialchars($email) . '</span>';
                         unset($_SESSION['new_user_credentials']);
                     }
-                    // If email fails, credentials stay in session to show on screen
-                } catch (Exception $e) {
-                    // Email failed silently — credentials will show on screen
-                }
+                } catch (Exception $e) { /* silent */ }
             }
 
-            // Notify the new user (in-app)
             notify($pdo, (int)$new_id,
                 'Welcome to BiT Payroll System',
                 "Your account has been created. Username: {$username} | Role: " . ucfirst($role) . ". Login to get started.",
                 'success');
 
-            // Notify admin (other admins)
             notify_role($pdo, 'admin',
                 'New User Created',
                 "Admin created new user: {$full_name} ({$username}) with role: " . ucfirst($role),
                 'info');
+
+            // ── PRG: store success, redirect to GET ──────────
+            $_SESSION['flash_success'] = $flash_success;
+            header('Location: users.php');
+            exit();
+
         } catch (PDOException $e) {
-            $error = 'Create failed: ' . $e->getMessage();
+            // ── PRG: store error + form data, redirect to GET with modal flag
+            $_SESSION['flash_error'] = 'Create failed: ' . $e->getMessage();
+            $_SESSION['flash_form']  = [
+                'full_name'   => $full_name,
+                'username'    => $username,
+                'role'        => $role,
+                'email'       => $email ?? '',
+                'link_emp_id' => $link_emp_id,
+            ];
+            header('Location: users.php?modal=add');
+            exit();
         }
     } else {
-        $error = implode('<br>', $errs);
+        // ── PRG: validation failed — store error + form data, redirect ──
+        $_SESSION['flash_error'] = implode('<br>', $errs);
+        $_SESSION['flash_form']  = [
+            'full_name'   => $full_name,
+            'username'    => $username,
+            'role'        => $role,
+            'email'       => $email ?? '',
+            'link_emp_id' => $link_emp_id,
+        ];
+        header('Location: users.php?modal=add');
+        exit();
     }
 }
 
@@ -289,11 +296,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                     $success .= ' <span style="color:var(--warning);">⚠️ Email not sent: ' . htmlspecialchars($mail_result['error']) . '</span>';
                 }
             }
+            // ── PRG: redirect after successful update ────────
+            $_SESSION['flash_success'] = $success;
+            header('Location: users.php');
+            exit();
         } catch (PDOException $e) {
-            $error = 'Update failed: ' . $e->getMessage();
+            $_SESSION['flash_error'] = 'Update failed: ' . $e->getMessage();
+            header('Location: users.php?edit=' . $uid);
+            exit();
         }
     } else {
-        $error = implode('<br>', $errs);
+        $_SESSION['flash_error'] = implode('<br>', $errs);
+        header('Location: users.php?edit=' . $uid);
+        exit();
     }
 }
 
@@ -304,13 +319,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['link_employee'])) {
 
     if ($uid && $emp_id) {
         try {
-            // Remove any existing link for this employee
             $pdo->prepare("UPDATE employees SET user_id = NULL WHERE user_id = ?")
                 ->execute([$uid]);
-            // Set new link
             $pdo->prepare("UPDATE employees SET user_id = ? WHERE emp_id = ?")
                 ->execute([$uid, $emp_id]);
-
             $pdo->prepare("
                 INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
                 VALUES (?, ?, ?, 'Link Employee', ?, ?, ?)
@@ -319,12 +331,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['link_employee'])) {
                 "user_id:{$uid}", "Linked to emp_id:{$emp_id}",
                 $_SERVER['REMOTE_ADDR'] ?? null
             ]);
-            $success = "User account linked to employee <strong>{$emp_id}</strong> successfully.";
+            $_SESSION['flash_success'] = "User account linked to employee <strong>{$emp_id}</strong> successfully.";
         } catch (PDOException $e) {
-            $error = 'Link failed: ' . $e->getMessage();
+            $_SESSION['flash_error'] = 'Link failed: ' . $e->getMessage();
         }
     }
+    header('Location: users.php?edit=' . $uid);
+    exit();
 }
+
 // ── DEACTIVATE user (soft disable) ────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['deactivate_user'])) {
     $uid = (int)($_POST['del_user_id'] ?? 0);
@@ -338,10 +353,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['deactivate_user'])) {
             $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
             "user_id:{$uid}", $_SERVER['REMOTE_ADDR'] ?? null
         ]);
-        $success = 'User account <strong>deactivated</strong>. They can no longer login.';
+        $_SESSION['flash_success'] = 'User account <strong>deactivated</strong>. They can no longer login.';
     } else {
-        $error = 'Cannot deactivate your own account.';
+        $_SESSION['flash_error'] = 'Cannot deactivate your own account.';
     }
+    header('Location: users.php');
+    exit();
 }
 
 // ── REACTIVATE user ────────────────────────────────────────
@@ -357,8 +374,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reactivate_user'])) {
             $_SESSION['user_id'], $_SESSION['username'], $_SESSION['role'],
             "user_id:{$uid}", $_SERVER['REMOTE_ADDR'] ?? null
         ]);
-        $success = 'User account <strong>reactivated</strong>. They can now login.';
+        $_SESSION['flash_success'] = 'User account <strong>reactivated</strong>. They can now login.';
     }
+    header('Location: users.php');
+    exit();
 }
 
 // ── PERMANENTLY DELETE user ────────────────────────────────
@@ -366,21 +385,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
     $uid = (int)($_POST['delete_user_id'] ?? 0);
     if ($uid && $uid !== (int)$_SESSION['user_id']) {
         try {
-            // Get user info before deleting
             $del_info = $pdo->prepare("SELECT username, full_name FROM users WHERE user_id = ?");
             $del_info->execute([$uid]);
             $del_row = $del_info->fetch();
 
             if ($del_row) {
-                // Unlink from employee record first
                 $pdo->prepare("UPDATE employees SET user_id = NULL WHERE user_id = ?")
                     ->execute([$uid]);
-
-                // Delete the user
                 $pdo->prepare("DELETE FROM users WHERE user_id = ?")
                     ->execute([$uid]);
-
-                // Audit log (use current admin's ID since user is gone)
                 $pdo->prepare("
                     INSERT INTO audit_logs (user_id, username, role, action, target, details, ip_address)
                     VALUES (?, ?, ?, 'Delete User', ?, ?, ?)
@@ -390,15 +403,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
                     "Permanently deleted: {$del_row['full_name']} ({$del_row['username']})",
                     $_SERVER['REMOTE_ADDR'] ?? null
                 ]);
-
-                $success = "User <strong>{$del_row['full_name']}</strong> ({$del_row['username']}) permanently deleted.";
+                $_SESSION['flash_success'] = "User <strong>{$del_row['full_name']}</strong> ({$del_row['username']}) permanently deleted.";
             }
         } catch (PDOException $e) {
-            $error = 'Delete failed: ' . $e->getMessage();
+            $_SESSION['flash_error'] = 'Delete failed: ' . $e->getMessage();
         }
     } else {
-        $error = 'Cannot delete your own account.';
+        $_SESSION['flash_error'] = 'Cannot delete your own account.';
     }
+    header('Location: users.php');
+    exit();
 }
 
 // ── Filters & pagination ───────────────────────────────────
@@ -743,8 +757,8 @@ require_once $depth . 'includes/header.php';
 </div>
 
 <!-- ── Add User Modal ── -->
-<div class="modal-overlay" id="addUserModal"
-     <?= (isset($_POST['create_user']) && $error) ? 'style="opacity:1;pointer-events:all;"' : '' ?>>
+<div class="modal-overlay <?= (isset($_GET['modal']) && $_GET['modal'] === 'add') ? 'active' : '' ?>"
+     id="addUserModal">
     <div class="modal">
         <div class="modal-header">
             <h3><i class="fas fa-user-plus" style="color:var(--primary);margin-right:8px"></i>
@@ -754,7 +768,8 @@ require_once $depth . 'includes/header.php';
         </div>
         <form method="POST" action="">
             <!-- Hidden: carries the employee ID when creating from the banner -->
-            <input type="hidden" name="link_emp_id" id="addLinkEmpId" value="">
+            <input type="hidden" name="link_emp_id" id="addLinkEmpId"
+                   value="<?= htmlspecialchars($_form['link_emp_id'] ?? '') ?>">
 
             <div class="modal-body">
 
@@ -773,10 +788,10 @@ require_once $depth . 'includes/header.php';
                     <select name="role" id="addRole" class="form-control" required
                             onchange="onRoleChange(this.value)">
                         <option value="">— Select Role —</option>
-                        <option value="admin">Administrator</option>
-                        <option value="hr">HR Personnel</option>
-                        <option value="finance">Finance Officer</option>
-                        <option value="employee">Employee</option>
+                        <option value="admin"    <?= ($_form['role'] ?? '') === 'admin'    ? 'selected' : '' ?>>Administrator</option>
+                        <option value="hr"       <?= ($_form['role'] ?? '') === 'hr'       ? 'selected' : '' ?>>HR Personnel</option>
+                        <option value="finance"  <?= ($_form['role'] ?? '') === 'finance'  ? 'selected' : '' ?>>Finance Officer</option>
+                        <option value="employee" <?= ($_form['role'] ?? '') === 'employee' ? 'selected' : '' ?>>Employee</option>
                     </select>
                 </div>
 
@@ -820,6 +835,7 @@ require_once $depth . 'includes/header.php';
                     <label class="form-label">Full Name <span style="color:var(--danger)">*</span></label>
                     <input type="text" name="full_name" id="addFullName" class="form-control"
                            placeholder="e.g. Admasu Dejene"
+                           value="<?= htmlspecialchars($_form['full_name'] ?? '') ?>"
                            minlength="2" maxlength="100" required>
                 </div>
 
@@ -831,13 +847,16 @@ require_once $depth . 'includes/header.php';
                         </span>
                     </label>
                     <input type="email" name="email" id="addEmail" class="form-control"
-                           placeholder="user@gmail.com" maxlength="180" required>
+                           placeholder="user@gmail.com"
+                           value="<?= htmlspecialchars($_form['email'] ?? '') ?>"
+                           maxlength="180" required>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Username <span style="color:var(--danger)">*</span></label>
                     <input type="text" name="username" id="addUsername" class="form-control"
                            placeholder="e.g. admasu.d"
+                           value="<?= htmlspecialchars($_form['username'] ?? '') ?>"
                            minlength="3" maxlength="30"
                            pattern="[a-z0-9_\.]+"
                            title="Lowercase letters, numbers, underscores and dots only"
@@ -1018,6 +1037,32 @@ require_once $depth . 'includes/header.php';
 <?php endif; ?>
 
 <script>
+// ── On page load: restore modal state if redirected back after error ──
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('modal') === 'add') {
+        // Trigger role-change logic so the employee picker shows if needed
+        const roleEl = document.getElementById('addRole');
+        if (roleEl && roleEl.value) {
+            onRoleChange(roleEl.value);
+            // If employee role, also restore the picker selection
+            if (roleEl.value === 'employee') {
+                const linkId = document.getElementById('addLinkEmpId').value;
+                const picker = document.getElementById('empPickerSelect');
+                if (picker && linkId) {
+                    for (let i = 0; i < picker.options.length; i++) {
+                        if (picker.options[i].value === linkId) {
+                            picker.selectedIndex = i;
+                            onEmployeePicked(picker);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+})();
+
 // ── Generate a strong random password ─────────────────────
 function generatePassword() {
     const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';

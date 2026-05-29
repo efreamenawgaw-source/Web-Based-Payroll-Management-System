@@ -420,7 +420,7 @@ require_once $depth . 'includes/header.php';
                         <option value="">Select Gender</option>
                         <option value="male"   <?= ($post['gender'] ?? '') === 'male'   ? 'selected' : '' ?>>Male</option>
                         <option value="female" <?= ($post['gender'] ?? '') === 'female' ? 'selected' : '' ?>>Female</option>
-                        <option value="other"  <?= ($post['gender'] ?? '') === 'other'  ? 'selected' : '' ?>>Other</option>
+                        
                     </select>
                 </div>
                 <div class="form-group">
